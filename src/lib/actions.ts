@@ -37,11 +37,21 @@ export async function getProjects(): Promise<{
       };
     }
 
-    const { data: expensesData, error: expensesError } = await supabase
+    let { data: expensesData, error: expensesError } = await supabase
       .from('expenses')
       .select('*')
       .is('deleted_at', null)
       .order('date', { ascending: false });
+
+    // Backward-compatible fallback if deleted_at column does not exist yet in Supabase
+    if (expensesError && expensesError.message?.includes('deleted_at')) {
+      const retry = await supabase
+        .from('expenses')
+        .select('*')
+        .order('date', { ascending: false });
+      expensesData = retry.data;
+      expensesError = retry.error;
+    }
 
     const expensesList: Expense[] = expensesError || !expensesData ? [] : expensesData;
 
@@ -87,12 +97,23 @@ export async function getProjectById(
       return fallback || null;
     }
 
-    const { data: expenses, error: expensesError } = await supabase
+    let { data: expenses, error: expensesError } = await supabase
       .from('expenses')
       .select('*')
       .eq('project_id', id)
       .is('deleted_at', null)
       .order('date', { ascending: false });
+
+    // Backward-compatible fallback if deleted_at column does not exist yet in Supabase
+    if (expensesError && expensesError.message?.includes('deleted_at')) {
+      const retry = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('project_id', id)
+        .order('date', { ascending: false });
+      expenses = retry.data;
+      expensesError = retry.error;
+    }
 
     const pExpenses: Expense[] = expensesError || !expenses ? [] : expenses;
     const total_spent = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -329,10 +350,19 @@ export async function softDeleteExpense(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const now = new Date().toISOString();
-    const { error } = await supabase
+    let { error } = await supabase
       .from('expenses')
       .update({ deleted_at: now })
       .eq('id', expenseId);
+
+    // Fallback if deleted_at column does not exist yet in Supabase
+    if (error && error.message?.includes('deleted_at')) {
+      const fallback = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', expenseId);
+      error = fallback.error;
+    }
 
     if (error) {
       console.error('softDeleteExpense error:', error);
