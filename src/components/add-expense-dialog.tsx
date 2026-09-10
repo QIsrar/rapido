@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Sheet,
@@ -15,11 +15,30 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@/components/ui/select';
-import { Camera, Plus, Loader2, X, ImageIcon } from 'lucide-react';
-import { EXPENSE_CATEGORIES, type ExpenseCategory, type Project } from '@/types/database';
-import { createExpense, updateExpenseReceipt, uploadReceiptAction } from '@/lib/actions';
+import {
+  Camera,
+  Plus,
+  Loader2,
+  X,
+  ImageIcon,
+  FolderPlus,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
+import {
+  EXPENSE_CATEGORIES,
+  PROJECT_TYPES,
+  type ExpenseCategory,
+  type Project,
+  type ProjectType,
+} from '@/types/database';
+import {
+  createExpense,
+  createProject,
+  updateExpenseReceipt,
+  uploadReceiptAction,
+} from '@/lib/actions';
 import { uploadReceipt } from '@/lib/storage';
 
 interface AddExpenseDialogProps {
@@ -28,13 +47,15 @@ interface AddExpenseDialogProps {
 }
 
 export function AddExpenseDialog({
-  projects = [],
+  projects: initialProjects = [],
   defaultProjectId = '',
 }: AddExpenseDialogProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isPending, startTransition] = useTransition();
 
   const [open, setOpen] = useState(false);
+  const [localProjects, setLocalProjects] = useState<Project[]>(initialProjects);
   const [projectId, setProjectId] = useState(defaultProjectId);
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('Materials');
@@ -44,7 +65,35 @@ export function AddExpenseDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const activeProjects = projects.filter((p) => p.status === 'active');
+  // Quick project creation state
+  const [showQuickProject, setShowQuickProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectType, setNewProjectType] = useState<ProjectType>('New Build');
+  const [newProjectBudget, setNewProjectBudget] = useState('');
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [quickProjectSuccess, setQuickProjectSuccess] = useState('');
+
+  // Sync projects prop
+  useEffect(() => {
+    setLocalProjects(initialProjects);
+  }, [initialProjects]);
+
+  // Sync defaultProjectId when opened
+  useEffect(() => {
+    if (defaultProjectId) {
+      setProjectId(defaultProjectId);
+    } else if (!projectId && localProjects.length > 0) {
+      const firstActive = localProjects.find((p) => p.status === 'active');
+      if (firstActive) setProjectId(firstActive.id);
+    }
+  }, [defaultProjectId, open, localProjects]);
+
+  // Allow active projects plus the default project if passed
+  const availableProjects = localProjects.filter(
+    (p) => p.status === 'active' || p.id === defaultProjectId
+  );
+
+  const selectedProject = localProjects.find((p) => p.id === projectId);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -76,18 +125,63 @@ export function AddExpenseDialog({
     }
   };
 
+  const handleQuickCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setQuickProjectSuccess('');
+
+    const trimmedName = newProjectName.trim();
+    if (!trimmedName) {
+      setErrorMsg('Please enter a project name.');
+      return;
+    }
+    const budgetNum = Number(newProjectBudget);
+    if (isNaN(budgetNum) || budgetNum <= 0) {
+      setErrorMsg('Please enter a valid budget amount in PKR.');
+      return;
+    }
+
+    setIsCreatingProject(true);
+    try {
+      const res = await createProject({
+        name: trimmedName,
+        type: newProjectType,
+        total_budget: budgetNum,
+      });
+
+      if (res.success && res.data) {
+        setLocalProjects((prev) => [res.data!, ...prev]);
+        setProjectId(res.data.id);
+        setShowQuickProject(false);
+        setNewProjectName('');
+        setNewProjectBudget('');
+        setQuickProjectSuccess(`Project "${res.data.name}" created and selected!`);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setErrorMsg(res.error || 'Failed to create project.');
+      }
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error creating project.');
+    } finally {
+      setIsCreatingProject(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setQuickProjectSuccess('');
 
     const amountNum = Number(amount);
     if (!amount || isNaN(amountNum) || amountNum <= 0) {
-      setErrorMsg('Please enter a valid expense amount.');
+      setErrorMsg('Please enter a valid expense amount in PKR.');
       return;
     }
 
     if (!projectId) {
-      setErrorMsg('Please select a project.');
+      setErrorMsg('Please select a project or create one first.');
       return;
     }
 
@@ -116,7 +210,6 @@ export function AddExpenseDialog({
       if (receiptFile && res.data.id) {
         let uploadedUrl: string | null = null;
 
-        // Try server action first
         try {
           const fd = new FormData();
           fd.append('file', receiptFile);
@@ -126,7 +219,7 @@ export function AddExpenseDialog({
             uploadedUrl = srvRes.url;
           }
         } catch {
-          // Fallback to client-side upload
+          // Fallback to client upload
         }
 
         if (!uploadedUrl) {
@@ -147,7 +240,9 @@ export function AddExpenseDialog({
       clearReceipt();
       if (!defaultProjectId) setProjectId('');
       setOpen(false);
-      router.refresh();
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error recording expense.');
     } finally {
@@ -157,54 +252,65 @@ export function AddExpenseDialog({
 
   return (
     <>
-      {/* FAB — Standalone floating button */}
+      {/* Standalone floating action button */}
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-20 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-2xl bg-orange-500 px-5 text-base font-bold text-white shadow-lg shadow-orange-500/30 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/40 active:scale-95 transition-all duration-200"
+        onClick={() => {
+          setOpen(true);
+          setErrorMsg('');
+          setQuickProjectSuccess('');
+        }}
+        className="fixed bottom-20 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-2xl bg-orange-600 px-5 text-base font-black text-white shadow-xl shadow-orange-600/30 hover:bg-orange-700 active:scale-95 transition-all duration-200 tap-scale"
       >
-        <Plus className="h-5 w-5" strokeWidth={3} />
+        <Plus className="h-6 w-6 stroke-[3]" />
         Log Expense
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
-          className="h-[88dvh] rounded-t-3xl border-t border-slate-200 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
+          className="h-[90dvh] rounded-t-3xl border-t-2 border-slate-300 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           <SheetHeader className="pb-3 text-left">
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-lg font-bold text-slate-900">
+              <SheetTitle className="text-xl font-black text-slate-900">
                 Log New Expense
               </SheetTitle>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close dialog"
-                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-xs text-slate-500">
-              Records today&apos;s date and updates the project cost instantly.
+            <p className="text-xs font-semibold text-slate-500">
+              Records timestamp and updates project spend instantly.
             </p>
           </SheetHeader>
 
           {errorMsg && (
-            <div className="p-3 mb-2 rounded-xl bg-red-50 border border-red-200 text-xs font-medium text-red-600">
-              {errorMsg}
+            <div className="p-3 mb-3 rounded-xl bg-red-50 border-2 border-red-200 text-xs font-bold text-red-600 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto">
+          {quickProjectSuccess && (
+            <div className="p-3 mb-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-xs font-bold text-emerald-700 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{quickProjectSuccess}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto max-h-[calc(90dvh-120px)] pr-1">
             {/* Amount */}
             <div className="space-y-1.5">
-              <Label htmlFor="amount" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="amount" className="text-xs font-black text-slate-800 uppercase tracking-wider">
                 Amount (PKR) *
               </Label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-400">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-500">
                   Rs.
                 </span>
                 <Input
@@ -215,32 +321,125 @@ export function AddExpenseDialog({
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
-                  className="h-14 pl-14 text-2xl font-bold rounded-xl border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-300 focus-visible:ring-orange-500"
+                  className="h-14 pl-14 text-2xl font-black rounded-xl border-2 border-slate-300 bg-white text-slate-900 placeholder:text-slate-300 focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-200 shadow-xs"
                 />
               </div>
             </div>
 
-            {/* Project Select */}
+            {/* Project Selection with Inline Create Project Option */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">
-                Project *
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Project *
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickProject(!showQuickProject)}
+                  className="text-xs font-black text-orange-600 hover:text-orange-700 flex items-center gap-1 tap-scale"
+                >
+                  <FolderPlus className="w-3.5 h-3.5" />
+                  {showQuickProject ? 'Cancel' : '+ New Project'}
+                </button>
+              </div>
+
+              {/* Quick Inline Project Creator */}
+              {showQuickProject && (
+                <div className="p-3.5 rounded-2xl bg-orange-50/80 border-2 border-orange-300 space-y-3 animate-slide-up">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black text-orange-950">Quick Create Project</p>
+                    <span className="text-[10px] text-orange-700 font-bold bg-orange-200/60 px-2 py-0.5 rounded-full">
+                      Step 1 of 2
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Project Name (e.g. Jinnahabad Build)"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      className="h-11 rounded-xl border-2 border-orange-200 bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400"
+                    />
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={newProjectType}
+                        onChange={(e) => setNewProjectType(e.target.value as ProjectType)}
+                        className="h-11 rounded-xl border-2 border-orange-200 bg-white px-3 text-xs font-bold text-slate-800"
+                      >
+                        {PROJECT_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                      </select>
+
+                      <Input
+                        type="number"
+                        placeholder="Budget in PKR"
+                        value={newProjectBudget}
+                        onChange={(e) => setNewProjectBudget(e.target.value)}
+                        className="h-11 rounded-xl border-2 border-orange-200 bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleQuickCreateProject}
+                      disabled={isCreatingProject}
+                      className="w-full h-10 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-black shadow-sm flex items-center justify-center gap-1.5 transition-all tap-scale disabled:opacity-50"
+                    >
+                      {isCreatingProject ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Creating Project...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Create &amp; Select Project
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Select Project Dropdown */}
               <Select
                 value={projectId}
                 onValueChange={(val) => setProjectId(val || '')}
                 required
               >
-                <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-slate-50/50 text-sm text-slate-900">
-                  <SelectValue placeholder="Select an active project..." />
+                <SelectTrigger className="h-12 rounded-xl border-2 border-slate-300 bg-white text-sm font-black text-slate-900 focus:border-orange-500 shadow-xs">
+                  <span className="truncate">
+                    {selectedProject
+                      ? selectedProject.name
+                      : availableProjects.length === 0
+                      ? 'No active projects — click + New Project above'
+                      : 'Select a project...'}
+                  </span>
                 </SelectTrigger>
-                <SelectContent className="bg-white border-slate-200">
-                  {activeProjects.length === 0 ? (
-                    <div className="p-3 text-xs text-slate-500 text-center">
-                      No active projects found. Create a project first!
+                <SelectContent className="bg-white border-2 border-slate-300 max-h-64 shadow-xl">
+                  {availableProjects.length === 0 ? (
+                    <div className="p-4 text-center space-y-2">
+                      <p className="text-xs font-black text-slate-700">
+                        No active projects found!
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickProject(true)}
+                        className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-black shadow-sm"
+                      >
+                        + Create Project Now
+                      </button>
                     </div>
                   ) : (
-                    activeProjects.map((p) => (
-                      <SelectItem key={p.id} value={p.id} className="text-sm cursor-pointer">
+                    availableProjects.map((p) => (
+                      <SelectItem
+                        key={p.id}
+                        value={p.id}
+                        className="text-sm font-bold text-slate-800 cursor-pointer py-2.5"
+                      >
                         {p.name}
                       </SelectItem>
                     ))
@@ -251,7 +450,7 @@ export function AddExpenseDialog({
 
             {/* Category — visual chips */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">
+              <Label className="text-xs font-black text-slate-800 uppercase tracking-wider">
                 Category *
               </Label>
               <div className="grid grid-cols-2 gap-2">
@@ -260,10 +459,10 @@ export function AddExpenseDialog({
                     key={cat}
                     type="button"
                     onClick={() => setCategory(cat)}
-                    className={`h-11 rounded-xl border text-xs font-medium transition-all tap-scale ${
+                    className={`h-11 rounded-xl border-2 text-xs font-bold transition-all tap-scale ${
                       category === cat
-                        ? 'border-orange-500 bg-orange-50 text-orange-600 font-semibold shadow-xs ring-1 ring-orange-500/20'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        ? 'border-orange-500 bg-orange-50 text-orange-600 font-black shadow-xs ring-1 ring-orange-500/30'
+                        : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     {cat}
@@ -276,13 +475,13 @@ export function AddExpenseDialog({
             <div className="space-y-1.5">
               <Label
                 htmlFor="description"
-                className="text-xs font-semibold text-slate-700 flex items-center justify-between"
+                className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between"
               >
                 <span>
                   {category === 'Misc' ? 'Item Name / Description *' : 'Description (optional)'}
                 </span>
                 {category === 'Misc' && (
-                  <span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider bg-orange-100/70 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] text-orange-700 font-black uppercase tracking-wider bg-orange-100 border border-orange-300 px-2 py-0.5 rounded-md">
                     Required for Misc
                   </span>
                 )}
@@ -297,17 +496,17 @@ export function AddExpenseDialog({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required={category === 'Misc'}
-                className={`h-12 rounded-xl border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 ${
+                className={`h-12 rounded-xl border-2 bg-white text-sm font-bold text-slate-900 placeholder:text-slate-400 ${
                   category === 'Misc' && !description.trim()
-                    ? 'border-orange-400 ring-1 ring-orange-200 bg-orange-50/20'
-                    : ''
+                    ? 'border-orange-500 ring-2 ring-orange-200 bg-orange-50/20'
+                    : 'border-slate-300'
                 }`}
               />
             </div>
 
             {/* Receipt Photo Upload */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">
+              <Label className="text-xs font-black text-slate-800 uppercase tracking-wider">
                 Receipt / Bill Photo (optional)
               </Label>
 
@@ -316,25 +515,25 @@ export function AddExpenseDialog({
                   <img
                     src={receiptPreview}
                     alt="Receipt preview"
-                    className="w-24 h-24 object-cover rounded-xl border-2 border-orange-300 shadow-sm"
+                    className="w-24 h-24 object-cover rounded-xl border-2 border-orange-400 shadow-md"
                   />
                   <button
                     type="button"
                     onClick={clearReceipt}
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center shadow-md hover:bg-red-600 transition-colors"
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg hover:bg-red-700 transition-colors"
                     title="Remove photo"
                   >
-                    <X className="h-3 w-3" strokeWidth={3} />
+                    <X className="h-3.5 w-3.5 stroke-[3]" />
                   </button>
                 </div>
               ) : (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex w-full items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-slate-500 transition-colors hover:border-orange-400 hover:text-orange-500 tap-scale"
+                  className="flex w-full items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed border-slate-400 bg-slate-50 text-slate-600 transition-colors hover:border-orange-500 hover:text-orange-600 tap-scale font-bold"
                 >
                   <Camera className="h-4 w-4" />
-                  <span className="text-xs font-medium">Take Photo or Upload Bill</span>
+                  <span className="text-xs font-bold">Take Photo or Upload Bill</span>
                 </button>
               )}
 
@@ -348,28 +547,33 @@ export function AddExpenseDialog({
               />
 
               {receiptFile && (
-                <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <ImageIcon className="h-3 w-3" />
+                <p className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
+                  <ImageIcon className="h-3.5 w-3.5 text-orange-600" />
                   {receiptFile.name} ({(receiptFile.size / 1024).toFixed(0)} KB)
                 </p>
               )}
             </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full h-13 rounded-xl bg-orange-500 text-sm font-bold text-white shadow-md shadow-orange-500/20 hover:bg-orange-600 active:scale-[0.98] disabled:opacity-50 transition-all flex items-center justify-center gap-2 mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {receiptFile ? 'Uploading & Saving...' : 'Recording Expense...'}
-                </>
-              ) : (
-                'Save Expense'
-              )}
-            </button>
+            {/* Submit Button */}
+            <div className="pt-2 pb-4">
+              <button
+                type="submit"
+                disabled={isSubmitting || isPending}
+                className="w-full h-14 rounded-2xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-base font-black text-white shadow-xl shadow-orange-600/30 transition-all tap-scale flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting || isPending ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Recording Expense...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-5 w-5 stroke-[3]" />
+                    Record Expense
+                  </>
+                )}
+              </button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>
