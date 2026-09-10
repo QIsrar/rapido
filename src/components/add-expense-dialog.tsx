@@ -151,9 +151,19 @@ export function AddExpenseDialog({
           className="h-[88dvh] rounded-t-3xl border-t border-slate-200 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           <SheetHeader className="pb-3 text-left">
-            <SheetTitle className="text-lg font-bold text-slate-900">
-              Log New Expense
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-lg font-bold text-slate-900">
+                Log New Expense
+              </SheetTitle>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close dialog"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-slate-500">
               Records today&apos;s date and updates the project cost instantly.
             </p>
@@ -165,7 +175,7 @@ export function AddExpenseDialog({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto">
             {/* Amount */}
             <div className="space-y-1.5">
               <Label htmlFor="amount" className="text-xs font-semibold text-slate-700">

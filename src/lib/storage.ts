@@ -12,33 +12,48 @@ export async function uploadReceipt(
   file: File,
   expenseId: string
 ): Promise<{ url: string | null; error: string | null }> {
-  if (file.size > MAX_SIZE_BYTES) {
-    return { url: null, error: 'File too large. Maximum size is 5MB.' };
+  try {
+    if (!file || !expenseId) {
+      return { url: null, error: 'File and expense ID are required.' };
+    }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      return { url: null, error: 'File too large. Maximum size is 5MB.' };
+    }
+
+    if (!file.type.startsWith('image/')) {
+      return { url: null, error: 'Only image files are allowed.' };
+    }
+
+    // Sanitize extension and expenseId to prevent path traversal
+    const rawExt = file.name.split('.').pop() || 'jpg';
+    const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const timestamp = Date.now();
+    const sanitizedExpenseId = expenseId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const path = `${sanitizedExpenseId}-${timestamp}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, {
+        cacheControl: '31536000', // 1 year cache
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Receipt upload error:', uploadError);
+      return { url: null, error: uploadError.message };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(BUCKET)
+      .getPublicUrl(path);
+
+    return { url: publicUrlData.publicUrl, error: null };
+  } catch (err: unknown) {
+    console.error('Receipt upload exception:', err);
+    return {
+      url: null,
+      error: err instanceof Error ? err.message : 'Upload failed',
+    };
   }
-
-  if (!file.type.startsWith('image/')) {
-    return { url: null, error: 'Only image files are allowed.' };
-  }
-
-  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const timestamp = Date.now();
-  const path = `${expenseId}-${timestamp}.${ext}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, {
-      cacheControl: '31536000', // 1 year cache
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error('Receipt upload error:', uploadError);
-    return { url: null, error: uploadError.message };
-  }
-
-  const { data: publicUrlData } = supabase.storage
-    .from(BUCKET)
-    .getPublicUrl(path);
-
-  return { url: publicUrlData.publicUrl, error: null };
 }

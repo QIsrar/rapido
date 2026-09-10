@@ -2,12 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 import { supabase } from './supabase';
-import type {
-  Project,
-  Expense,
-  ProjectWithExpenses,
-  ProjectType,
-  ExpenseCategory,
+import {
+  type Project,
+  type Expense,
+  type ProjectWithExpenses,
+  type ProjectType,
+  type ExpenseCategory,
+  PROJECT_TYPES,
+  EXPENSE_CATEGORIES,
 } from '@/types/database';
 import {
   projects as fallbackProjects,
@@ -140,11 +142,23 @@ export async function createProject(formData: {
   total_budget: number;
 }): Promise<{ success: boolean; data?: Project; error?: string }> {
   try {
+    const name = formData.name?.trim();
+    if (!name) {
+      return { success: false, error: 'Project name is required.' };
+    }
+    const budget = Number(formData.total_budget);
+    if (isNaN(budget) || budget <= 0) {
+      return { success: false, error: 'Total budget must be a positive number.' };
+    }
+    if (!PROJECT_TYPES.includes(formData.type)) {
+      return { success: false, error: 'Invalid project type.' };
+    }
+
     const now = new Date().toISOString();
     const newProject = {
-      name: formData.name.trim(),
+      name,
       type: formData.type,
-      total_budget: Number(formData.total_budget),
+      total_budget: budget,
       status: 'active',
       start_date: now,
       created_at: now,
@@ -181,6 +195,10 @@ export async function completeProject(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!id || typeof id !== 'string') {
+      return { success: false, error: 'Valid project ID is required.' };
+    }
+
     const now = new Date().toISOString();
     const { error } = await supabase
       .from('projects')
@@ -221,10 +239,21 @@ export async function createExpense(formData: {
   date?: string;
 }): Promise<{ success: boolean; data?: Expense; error?: string }> {
   try {
+    if (!formData.project_id || typeof formData.project_id !== 'string') {
+      return { success: false, error: 'Valid project ID is required.' };
+    }
+    const amount = Number(formData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      return { success: false, error: 'Expense amount must be greater than 0.' };
+    }
+    if (!EXPENSE_CATEGORIES.includes(formData.category)) {
+      return { success: false, error: 'Invalid expense category.' };
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const newExpense = {
       project_id: formData.project_id,
-      amount: Number(formData.amount),
+      amount,
       category: formData.category,
       description: formData.description?.trim() || formData.category,
       receipt_url: formData.receipt_url || null,
@@ -318,6 +347,10 @@ export async function updateExpenseReceipt(
   receiptUrl: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!expenseId || !receiptUrl) {
+      return { success: false, error: 'Expense ID and receipt URL are required.' };
+    }
+
     const { error } = await supabase
       .from('expenses')
       .update({ receipt_url: receiptUrl })
@@ -349,6 +382,10 @@ export async function softDeleteExpense(
   projectId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!expenseId) {
+      return { success: false, error: 'Valid expense ID is required.' };
+    }
+
     const now = new Date().toISOString();
     let { error } = await supabase
       .from('expenses')

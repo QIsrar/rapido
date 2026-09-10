@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Hammer, Building2, Wrench, Loader2 } from 'lucide-react';
+import { Plus, Hammer, Building2, Wrench, Loader2, X } from 'lucide-react';
 import { PROJECT_TYPES, type ProjectType } from '@/types/database';
 import { createProject } from '@/lib/actions';
 
@@ -118,9 +118,19 @@ export function AddProjectDialog({
           className="h-[80dvh] rounded-t-3xl border-t border-slate-200 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           <SheetHeader className="pb-3 text-left">
-            <SheetTitle className="text-lg font-bold text-slate-900">
-              Create New Project
-            </SheetTitle>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-lg font-bold text-slate-900">
+                Create New Project
+              </SheetTitle>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close dialog"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <p className="text-xs text-slate-500">
               Start date and time are automatically recorded upon creation.
             </p>
@@ -132,7 +142,7 @@ export function AddProjectDialog({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto">
             {/* Project Name */}
             <div className="space-y-1.5">
               <Label htmlFor="projectName" className="text-xs font-semibold text-slate-700">
