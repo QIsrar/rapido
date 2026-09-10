@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 import {
   type Project,
   type Expense,
@@ -25,6 +25,12 @@ export async function getProjects(): Promise<{
   isLive: boolean;
 }> {
   try {
+    if (!isSupabaseConfigured) {
+      return {
+        projects: getFallbackProjectsWithExpenses(),
+        isLive: false,
+      };
+    }
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('*')
@@ -87,6 +93,11 @@ export async function getProjectById(
   id: string
 ): Promise<ProjectWithExpenses | null> {
   try {
+    if (!isSupabaseConfigured) {
+      const fallback = getFallbackProjectsWithExpenses().find((p) => p.id === id);
+      return fallback || null;
+    }
+
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')

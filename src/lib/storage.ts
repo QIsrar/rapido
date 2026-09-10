@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 const BUCKET = 'receipts';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -13,6 +13,10 @@ export async function uploadReceipt(
   expenseId: string
 ): Promise<{ url: string | null; error: string | null }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { url: null, error: 'Supabase storage is not configured.' };
+    }
+
     if (!file || !expenseId) {
       return { url: null, error: 'File and expense ID are required.' };
     }
