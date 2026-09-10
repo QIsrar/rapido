@@ -25,6 +25,8 @@ import {
   FolderPlus,
   CheckCircle2,
   AlertCircle,
+  Briefcase,
+  MapPin,
 } from 'lucide-react';
 import {
   EXPENSE_CATEGORIES,
@@ -40,6 +42,8 @@ import {
   uploadReceiptAction,
 } from '@/lib/actions';
 import { uploadReceipt } from '@/lib/storage';
+import { formatPKR } from '@/lib/utils';
+
 
 interface AddExpenseDialogProps {
   projects?: Project[];
@@ -70,6 +74,7 @@ export function AddExpenseDialog({
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectType, setNewProjectType] = useState<ProjectType>('New Build');
   const [newProjectBudget, setNewProjectBudget] = useState('');
+  const [newProjectLocation, setNewProjectLocation] = useState('');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [quickProjectSuccess, setQuickProjectSuccess] = useState('');
 
@@ -147,6 +152,7 @@ export function AddExpenseDialog({
         name: trimmedName,
         type: newProjectType,
         total_budget: budgetNum,
+        location: newProjectLocation.trim() || undefined,
       });
 
       if (res.success && res.data) {
@@ -155,6 +161,7 @@ export function AddExpenseDialog({
         setShowQuickProject(false);
         setNewProjectName('');
         setNewProjectBudget('');
+        setNewProjectLocation('');
         setQuickProjectSuccess(`Project "${res.data.name}" created and selected!`);
         startTransition(() => {
           router.refresh();
@@ -175,8 +182,8 @@ export function AddExpenseDialog({
     setQuickProjectSuccess('');
 
     const amountNum = Number(amount);
-    if (!amount || isNaN(amountNum) || amountNum <= 0) {
-      setErrorMsg('Please enter a valid expense amount in PKR.');
+    if (!amount || isNaN(amountNum) || amountNum < 10) {
+      setErrorMsg('Please enter an expense amount of at least Rs. 10.');
       return;
     }
 
@@ -272,18 +279,9 @@ export function AddExpenseDialog({
           className="h-[90dvh] rounded-t-3xl border-t-2 border-slate-300 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           <SheetHeader className="pb-3 text-left">
-            <div className="flex items-center justify-between">
-              <SheetTitle className="text-xl font-black text-slate-900">
-                Log New Expense
-              </SheetTitle>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+            <SheetTitle className="text-xl font-black text-slate-900">
+              Log New Expense
+            </SheetTitle>
             <p className="text-xs font-semibold text-slate-500">
               Records timestamp and updates project spend instantly.
             </p>
@@ -306,9 +304,14 @@ export function AddExpenseDialog({
           <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto max-h-[calc(90dvh-120px)] pr-1">
             {/* Amount */}
             <div className="space-y-1.5">
-              <Label htmlFor="amount" className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Amount (PKR) *
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="amount" className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Amount (PKR) *
+                </Label>
+                <span className="text-[10px] font-bold text-slate-500">
+                  Min: Rs. 10
+                </span>
+              </div>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-500">
                   Rs.
@@ -317,7 +320,9 @@ export function AddExpenseDialog({
                   id="amount"
                   type="number"
                   inputMode="decimal"
-                  placeholder="0"
+                  min="10"
+                  step="any"
+                  placeholder="e.g. 5000"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   required
@@ -381,6 +386,13 @@ export function AddExpenseDialog({
                         className="h-11 rounded-xl border-2 border-orange-200 bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400"
                       />
                     </div>
+
+                    <Input
+                      placeholder="Location / Google Maps link (optional)"
+                      value={newProjectLocation}
+                      onChange={(e) => setNewProjectLocation(e.target.value)}
+                      className="h-11 rounded-xl border-2 border-orange-200 bg-white text-xs font-bold text-slate-900 placeholder:text-slate-400"
+                    />
 
                     <button
                       type="button"
@@ -446,6 +458,48 @@ export function AddExpenseDialog({
                   )}
                 </SelectContent>
               </Select>
+
+              {/* Live Project Overview Snapshot Card */}
+              {selectedProject && (
+                <div className="p-3 rounded-2xl bg-slate-50 border-2 border-slate-200 space-y-2 animate-fade-in mt-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-black text-slate-800 flex items-center gap-1.5 truncate">
+                      <Briefcase className="w-3.5 h-3.5 text-orange-600 shrink-0" />
+                      {selectedProject.name}
+                    </span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 shrink-0">
+                      {selectedProject.type}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-slate-200 text-[11px]">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Total Budget</span>
+                      <span className="font-extrabold text-slate-800">
+                        {formatPKR(selectedProject.total_budget)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Total Spent</span>
+                      <span className="font-extrabold text-orange-600">
+                        {formatPKR((selectedProject as any).total_spent || 0)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Remaining</span>
+                      <span className="font-extrabold text-emerald-600">
+                        {formatPKR(
+                          Math.max(
+                            selectedProject.total_budget -
+                              ((selectedProject as any).total_spent || 0),
+                            0
+                          )
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Category — visual chips */}

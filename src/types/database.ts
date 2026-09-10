@@ -18,6 +18,7 @@ export interface Project {
   type: ProjectType;
   total_budget: number;
   status: ProjectStatus;
+  location?: string | null;
   start_date: string;
   completed_at: string | null;
   created_at: string;

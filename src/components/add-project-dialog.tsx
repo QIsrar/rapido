@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
   Sheet,
@@ -10,7 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Loader2, Home, Hammer, Wrench, X, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, Home, Hammer, Wrench, X, AlertCircle, MapPin, Sparkles } from 'lucide-react';
 import { PROJECT_TYPES, type ProjectType } from '@/types/database';
 import { createProject } from '@/lib/actions';
 
@@ -36,8 +37,25 @@ export function AddProjectDialog({
   const [name, setName] = useState('');
   const [type, setType] = useState<ProjectType>('New Build');
   const [budget, setBudget] = useState('');
+  const [location, setLocation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // 5-second countdown celebration state
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationName, setCelebrationName] = useState('');
+
+  const formatBudgetPreview = (numStr: string) => {
+    const val = Number(numStr);
+    if (!numStr || isNaN(val) || val <= 0) return null;
+    if (val >= 10000000) {
+      return `Rs. ${(val / 10000000).toFixed(2)} Crore (PKR ${val.toLocaleString('en-PK')})`;
+    }
+    if (val >= 100000) {
+      return `Rs. ${(val / 100000).toFixed(2)} Lac (PKR ${val.toLocaleString('en-PK')})`;
+    }
+    return `PKR ${val.toLocaleString('en-PK')}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,19 +79,44 @@ export function AddProjectDialog({
         name: trimmedName,
         type,
         total_budget: budgetNum,
+        location: location.trim() || undefined,
       });
 
-      if (!res.success) {
+      if (!res.success || !res.data) {
         setErrorMsg(res.error || 'Failed to create project.');
         setIsSubmitting(false);
         return;
       }
 
-      // Success
+      const createdId = res.data.id;
+      const createdName = res.data.name;
+
+      // Store recently created project ID in sessionStorage for dashboard highlighting
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('recentlyCreatedProjectId', createdId);
+        window.dispatchEvent(
+          new CustomEvent('project-created', {
+            detail: { id: createdId, name: createdName },
+          })
+        );
+      }
+
+      // Trigger 5s celebration animation
+      setCelebrationName(createdName);
+      setShowCelebration(true);
+
+      // Auto dismiss after 5 seconds
+      setTimeout(() => {
+        setShowCelebration(false);
+      }, 5000);
+
+      // Reset form & close sheet
       setName('');
       setType('New Build');
       setBudget('');
+      setLocation('');
       setOpen(false);
+
       startTransition(() => {
         router.refresh();
       });
@@ -116,6 +159,45 @@ export function AddProjectDialog({
         </button>
       )}
 
+      {/* 5-second Success Celebration Banner */}
+      {showCelebration && typeof document !== 'undefined' && createPortal(
+        <div className="fixed top-4 inset-x-4 max-w-md mx-auto z-[99999] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-slate-900/95 backdrop-blur-md text-white rounded-2xl p-4 border-2 border-orange-500 shadow-2xl shadow-orange-500/20 relative overflow-hidden">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-orange-500/20 border border-orange-500/40 flex items-center justify-center text-xl shrink-0">
+                  🎉
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-white flex items-center gap-1.5">
+                    Project Created Successfully!
+                  </h4>
+                  <p className="text-xs font-semibold text-orange-400 mt-0.5 line-clamp-1">
+                    "{celebrationName}" is highlighted on your dashboard
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCelebration(false)}
+                aria-label="Close"
+                className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {/* 5-second animated progress bar */}
+            <div className="mt-3 w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-orange-500 to-amber-400 h-full w-full origin-left" 
+                style={{ animation: 'shrink 5s linear forwards' }}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Bottom Sheet modal */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
@@ -131,7 +213,7 @@ export function AddProjectDialog({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close dialog"
-                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -165,6 +247,25 @@ export function AddProjectDialog({
               />
             </div>
 
+            {/* Site Location (Optional) */}
+            <div className="space-y-1.5">
+              <Label htmlFor="projectLocation" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 text-orange-500" />
+                  Site Location / Google Maps Link
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 normal-case">(Optional)</span>
+              </Label>
+              <Input
+                id="projectLocation"
+                type="text"
+                placeholder="e.g. Sector F-7, Islamabad or https://maps.app.goo.gl/..."
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                className="h-12 rounded-xl border-2 border-slate-300 bg-white text-sm font-bold text-slate-900 placeholder:text-slate-400 focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-200"
+              />
+            </div>
+
             {/* Project Type Chips */}
             <div className="space-y-1.5">
               <Label className="text-xs font-black text-slate-800 uppercase tracking-wider">
@@ -179,7 +280,7 @@ export function AddProjectDialog({
                       key={t}
                       type="button"
                       onClick={() => setType(t)}
-                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 text-center transition-all tap-scale ${
+                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 text-center transition-all tap-scale cursor-pointer ${
                         isSelected
                           ? 'border-orange-500 bg-orange-50 text-orange-600 font-black shadow-xs ring-1 ring-orange-500/30'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 font-bold'
@@ -206,13 +307,20 @@ export function AddProjectDialog({
                   id="projectBudget"
                   type="number"
                   inputMode="numeric"
-                  placeholder="5000000"
+                  placeholder="300000"
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   required
                   className="h-14 pl-14 text-xl font-black rounded-xl border-2 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-200"
                 />
               </div>
+              {/* Live Pakistani Lakh/Crore preview to prevent input typos */}
+              {formatBudgetPreview(budget) && (
+                <div className="p-2.5 rounded-xl bg-orange-50 border border-orange-200/80 text-xs font-black text-orange-700 flex items-center gap-1.5 animate-in fade-in duration-200">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0 text-orange-600" />
+                  <span>{formatBudgetPreview(budget)}</span>
+                </div>
+              )}
               <p className="text-[11px] font-medium text-slate-500">
                 Required to track spending limits and progress bars.
               </p>

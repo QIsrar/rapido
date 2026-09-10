@@ -44,10 +44,15 @@ CREATE TABLE IF NOT EXISTS projects (
   type project_type NOT NULL,
   total_budget NUMERIC(12, 2) NOT NULL DEFAULT 0,
   status project_status NOT NULL DEFAULT 'active',
+  location TEXT,                     -- Site location or Google Maps link
   start_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Ensure location column exists if table was created in an earlier migration
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS location TEXT;
+
 
 -- ============================================================
 -- EXPENSES TABLE

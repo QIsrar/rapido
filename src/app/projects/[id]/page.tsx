@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, CheckCircle2, Receipt } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Receipt, MapPin, ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -122,8 +122,8 @@ export default async function ProjectDetailsPage({
           </Badge>
         </div>
 
-        {/* Timestamps */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+        {/* Timestamps & Location */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <Calendar className="h-3.5 w-3.5 text-slate-400" />
             <span>Started: <strong className="font-semibold text-slate-700">{startDateFormatted}</strong></span>
@@ -135,31 +135,73 @@ export default async function ProjectDetailsPage({
               <span>Finished: <strong className="font-semibold text-emerald-800">{completedDateFormatted}</strong></span>
             </div>
           )}
+
+          {project.location && (
+            <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+              <MapPin className="h-3.5 w-3.5 text-orange-600" />
+              {project.location.startsWith('http') || project.location.includes('maps.google') ? (
+                <a
+                  href={project.location}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-orange-600 hover:text-orange-700 font-bold underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Google Maps Link</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              ) : (
+                <span>Location: <strong className="font-bold text-slate-800">{project.location}</strong></span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
       {/* Budget Overview Card */}
       <Card className="p-5 bg-white border border-slate-200 shadow-elevated mb-5 animate-slide-up" style={{ animationDelay: '60ms' }}>
-        <div className="text-center mb-4">
-          <p className="text-[11px] text-slate-500 uppercase tracking-wider font-bold mb-1">
-            {isOverBudget ? 'Over Budget By' : 'Remaining Budget'}
-          </p>
-          <p
-            className={`text-3xl font-black tracking-tight ${
+        {/* 3 Explicit Financial Metric Boxes */}
+        <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+              Total Budget
+            </span>
+            <span className="text-sm font-black text-slate-900 block truncate mt-1">
+              {formatPKR(project.total_budget)}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+            <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">
+              Total Spent
+            </span>
+            <span className="text-sm font-black text-amber-950 block truncate mt-1">
+              {formatPKR(project.total_spent)}
+            </span>
+          </div>
+
+          <div
+            className={`p-3 rounded-2xl border ${
               isOverBudget
-                ? 'text-red-600'
-                : isWarning
-                ? 'text-amber-600'
-                : 'text-emerald-600'
+                ? 'bg-red-50 border-red-200 text-red-900'
+                : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
             }`}
           >
-            {formatPKR(Math.abs(remaining))}
-          </p>
+            <span
+              className={`text-[10px] font-black uppercase tracking-wider block ${
+                isOverBudget ? 'text-red-700' : 'text-emerald-700'
+              }`}
+            >
+              {isOverBudget ? 'Over Budget' : 'Remaining'}
+            </span>
+            <span className="text-sm font-black block truncate mt-1">
+              {formatPKR(Math.abs(remaining))}
+            </span>
+          </div>
         </div>
 
         <Progress
           value={percentage}
-          className={`h-3 rounded-full bg-slate-100 mb-3.5 animate-progress-fill ${
+          className={`h-3 rounded-full bg-slate-100 mb-2 animate-progress-fill ${
             isOverBudget
               ? '[&>div]:bg-red-500'
               : isWarning
@@ -168,19 +210,11 @@ export default async function ProjectDetailsPage({
           }`}
         />
 
-        <div className="flex justify-between text-xs pt-1 border-t border-slate-100">
-          <div>
-            <p className="text-slate-500 text-[11px]">Total Spent</p>
-            <p className="font-bold text-slate-900 text-sm">
-              {formatPKR(project.total_spent)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-slate-500 text-[11px]">Total Budget</p>
-            <p className="font-bold text-slate-900 text-sm">
-              {formatPKR(project.total_budget)}
-            </p>
-          </div>
+        <div className="flex justify-between items-center text-xs text-slate-500 pt-1 font-semibold">
+          <span>{percentage.toFixed(1)}% of budget utilized</span>
+          <span className={isOverBudget ? 'text-red-600 font-bold' : isWarning ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
+            {isOverBudget ? `Over limit by ${formatPKR(Math.abs(remaining))}` : `${formatPKR(remaining)} available`}
+          </span>
         </div>
       </Card>
 

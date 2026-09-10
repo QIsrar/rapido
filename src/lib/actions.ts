@@ -7,6 +7,7 @@ import {
   type Expense,
   type ProjectWithExpenses,
   type ProjectType,
+  type ProjectStatus,
   type ExpenseCategory,
   PROJECT_TYPES,
   EXPENSE_CATEGORIES,
@@ -163,6 +164,7 @@ export async function createProject(formData: {
   name: string;
   type: ProjectType;
   total_budget: number;
+  location?: string;
 }): Promise<{ success: boolean; data?: Project; error?: string }> {
   try {
     if (!isSupabaseConfigured) {
@@ -182,20 +184,33 @@ export async function createProject(formData: {
     }
 
     const now = new Date().toISOString();
-    const newProject = {
+    const newProject: Record<string, unknown> = {
       name,
       type: formData.type,
       total_budget: budget,
       status: 'active',
+      location: formData.location?.trim() || null,
       start_date: now,
       created_at: now,
     };
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('projects')
       .insert([newProject])
       .select()
       .single();
+
+    // Fallback if location column not yet present in Supabase
+    if (error && error.message?.includes('location')) {
+      delete newProject.location;
+      const retry = await supabase
+        .from('projects')
+        .insert([newProject])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('createProject error:', error);
@@ -213,6 +228,79 @@ export async function createProject(formData: {
     };
   }
 }
+
+/**
+ * Update an existing project's metadata (budget, name, type, location).
+ */
+export async function updateProject(
+  id: string,
+  formData: {
+    name?: string;
+    type?: ProjectType;
+    total_budget?: number;
+    location?: string;
+    status?: ProjectStatus;
+  }
+): Promise<{ success: boolean; data?: Project; error?: string }> {
+  try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+    if (!id) {
+      return { success: false, error: 'Valid project ID is required.' };
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (formData.name?.trim()) updates.name = formData.name.trim();
+    if (formData.type && PROJECT_TYPES.includes(formData.type)) updates.type = formData.type;
+    if (formData.total_budget !== undefined && Number(formData.total_budget) > 0) {
+      updates.total_budget = Number(formData.total_budget);
+    }
+    if (formData.location !== undefined) {
+      updates.location = formData.location.trim() || null;
+    }
+    if (formData.status) {
+      updates.status = formData.status;
+    }
+
+    let { data, error } = await supabase
+      .from('projects')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error && error.message?.includes('location')) {
+      delete updates.location;
+      const retry = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      console.error('updateProject error:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/');
+    revalidatePath('/projects');
+    revalidatePath(`/projects/${id}`);
+    revalidatePath('/reports');
+    return { success: true, data };
+  } catch (err: unknown) {
+    console.error('updateProject exception:', err);
+    return {
+      success: false,
+      error: formatErrorMessage(err, 'Unknown error updating project'),
+    };
+  }
+}
+
 
 /**
  * Mark a project as completed.
@@ -279,8 +367,8 @@ export async function createExpense(formData: {
       return { success: false, error: 'Valid project ID is required.' };
     }
     const amount = Number(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      return { success: false, error: 'Expense amount must be greater than 0.' };
+    if (isNaN(amount) || amount < 10) {
+      return { success: false, error: 'Expense amount must be at least Rs. 10.' };
     }
     if (!EXPENSE_CATEGORIES.includes(formData.category)) {
       return { success: false, error: 'Invalid expense category.' };
@@ -550,7 +638,7 @@ export async function softDeleteExpense(
 export interface ReportsData {
   categoryTotals: { category: string; total: number }[];
   monthlyTrend: { month: string; total: number; count: number }[];
-  budgetVsActual: { name: string; fullName: string; budget: number; spent: number }[];
+  budgetVsActual: { id: string; name: string; fullName: string; budget: number; spent: number }[];
   quickStats: {
     totalProjects: number;
     totalLifetimeSpend: number;
@@ -599,6 +687,7 @@ export async function getReportsData(): Promise<ReportsData> {
     .filter((p) => p.total_budget > 0)
     .slice(0, 8)
     .map((p) => ({
+      id: p.id,
       name: p.name.length > 14 ? p.name.substring(0, 14) + '…' : p.name,
       fullName: p.name,
       budget: Number(p.total_budget),

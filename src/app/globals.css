@@ -305,3 +305,26 @@ button:focus-visible {
     to { opacity: 1; }
   }
 }
+
+/* ============================================================
+   GLOBAL INTERACTION CURSORS
+   ============================================================ */
+button,
+[role="button"],
+a,
+input[type="submit"],
+input[type="button"],
+select,
+summary,
+.tap-scale {
+  cursor: pointer !important;
+}
+
+@keyframes shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
