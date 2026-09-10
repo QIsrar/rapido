@@ -38,8 +38,8 @@ export default function SettingsPage() {
                 <p className="text-sm font-bold text-slate-900">Supabase Connected</p>
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 break-all">
-                URL: https://bcfshjykidmvajiuqkos.supabase.co
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cloud PostgreSQL &amp; Storage Active
               </p>
             </div>
           </div>
