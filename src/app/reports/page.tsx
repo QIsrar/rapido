@@ -3,10 +3,11 @@ import { getReportsData } from '@/lib/actions';
 import { formatPKR } from '@/lib/utils';
 import {
   Briefcase,
-  DollarSign,
   TrendingUp,
   Award,
 } from 'lucide-react';
+import { BudgetVsActualChart } from '@/components/budget-vs-actual-chart';
+import { MonthlySpendingChart } from '@/components/monthly-spending-chart';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,17 +28,6 @@ export default async function ReportsPage() {
   const { categoryTotals, monthlyTrend, budgetVsActual, quickStats } = data;
 
   const maxCategoryTotal = Math.max(...categoryTotals.map((c) => c.total), 1);
-  const maxMonthlyTotal = Math.max(...monthlyTrend.map((m) => m.total), 1);
-  const maxBudgetOrSpent = Math.max(
-    ...budgetVsActual.flatMap((b) => [b.budget, b.spent]),
-    1
-  );
-
-  const monthLabels = monthlyTrend.map((m) => {
-    const [y, mo] = m.month.split('-');
-    const d = new Date(Number(y), Number(mo) - 1);
-    return d.toLocaleDateString('en-PK', { month: 'short' });
-  });
 
   return (
     <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
@@ -67,7 +57,7 @@ export default async function ReportsPage() {
         <Card className="p-3.5 stat-gradient-emerald border border-emerald-200/50 shadow-xs">
           <div className="flex items-center gap-2 mb-1.5">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="text-xs font-black text-emerald-600 leading-none">₨</span>
             </div>
             <span className="text-[10px] text-emerald-700/70 uppercase tracking-wider font-bold">
               Total Spend
@@ -145,193 +135,26 @@ export default async function ReportsPage() {
         </section>
       )}
 
-      {/* Budget vs Actual — Grouped Bar Chart (SVG) */}
+      {/* Budget vs Actual — Interactive Responsive Component */}
       {budgetVsActual.length > 0 && (
         <section className="mb-6 animate-slide-up" style={{ animationDelay: '160ms' }}>
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
             Budget vs Actual
           </h2>
-          <Card className="p-4 bg-white border border-slate-200 shadow-xs overflow-x-auto">
-            <svg
-              viewBox={`0 0 ${Math.max(budgetVsActual.length * 100, 300)} 200`}
-              className="w-full h-48"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              {/* Grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map((frac) => (
-                <line
-                  key={frac}
-                  x1="0"
-                  y1={180 - frac * 160}
-                  x2={budgetVsActual.length * 100}
-                  y2={180 - frac * 160}
-                  stroke="#E2E8F0"
-                  strokeWidth="1"
-                  strokeDasharray={frac === 0 ? '0' : '4,4'}
-                />
-              ))}
-
-              {budgetVsActual.map((item, i) => {
-                const x = i * 100 + 15;
-                const budgetH = (item.budget / maxBudgetOrSpent) * 160;
-                const spentH = (item.spent / maxBudgetOrSpent) * 160;
-                const isOver = item.spent > item.budget;
-
-                return (
-                  <g key={item.name}>
-                    {/* Budget bar */}
-                    <rect
-                      x={x}
-                      y={180 - budgetH}
-                      width="30"
-                      height={budgetH}
-                      rx="4"
-                      fill="#E2E8F0"
-                    />
-                    {/* Actual bar */}
-                    <rect
-                      x={x + 35}
-                      y={180 - spentH}
-                      width="30"
-                      height={spentH}
-                      rx="4"
-                      fill={isOver ? '#EF4444' : '#F97316'}
-                    />
-                    {/* Label */}
-                    <text
-                      x={x + 32}
-                      y="196"
-                      textAnchor="middle"
-                      className="fill-slate-500"
-                      fontSize="9"
-                      fontWeight="600"
-                    >
-                      {item.name.length > 12 ? item.name.substring(0, 12) + '…' : item.name}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-slate-100">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-slate-200" />
-                <span className="text-[10px] font-semibold text-slate-500">Budget</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-orange-500" />
-                <span className="text-[10px] font-semibold text-slate-500">Actual</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-red-500" />
-                <span className="text-[10px] font-semibold text-slate-500">Over Budget</span>
-              </div>
-            </div>
+          <Card className="p-4 bg-white border border-slate-200 shadow-xs">
+            <BudgetVsActualChart data={budgetVsActual} />
           </Card>
         </section>
       )}
 
-      {/* Monthly Spending Trend — Area Chart (SVG) */}
+      {/* Monthly Spending Trend — Interactive Responsive Component */}
       {monthlyTrend.length > 0 && (
         <section className="mb-6 animate-slide-up" style={{ animationDelay: '240ms' }}>
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
             Monthly Spending (Last 6 Months)
           </h2>
           <Card className="p-4 bg-white border border-slate-200 shadow-xs">
-            <svg viewBox="0 0 320 180" className="w-full h-44" preserveAspectRatio="xMidYMid meet">
-              <defs>
-                <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#F97316" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#F97316" stopOpacity="0.02" />
-                </linearGradient>
-              </defs>
-
-              {/* Grid lines */}
-              {[0, 0.25, 0.5, 0.75, 1].map((frac) => (
-                <line
-                  key={frac}
-                  x1="30"
-                  y1={150 - frac * 130}
-                  x2="310"
-                  y2={150 - frac * 130}
-                  stroke="#E2E8F0"
-                  strokeWidth="0.5"
-                  strokeDasharray="4,4"
-                />
-              ))}
-
-              {/* Y-axis labels */}
-              {[0, 0.5, 1].map((frac) => (
-                <text
-                  key={frac}
-                  x="26"
-                  y={154 - frac * 130}
-                  textAnchor="end"
-                  className="fill-slate-400"
-                  fontSize="8"
-                >
-                  {formatPKR(Math.round(maxMonthlyTotal * frac)).replace('Rs. ', '')}
-                </text>
-              ))}
-
-              {(() => {
-                const points = monthlyTrend.map((m, i) => {
-                  const x = 45 + i * ((310 - 45) / Math.max(monthlyTrend.length - 1, 1));
-                  const y = 150 - (m.total / maxMonthlyTotal) * 130;
-                  return { x, y, total: m.total };
-                });
-
-                // Build area path
-                const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-                const areaPath = `${linePath} L${points[points.length - 1].x},150 L${points[0].x},150 Z`;
-
-                return (
-                  <>
-                    {/* Area fill */}
-                    <path d={areaPath} fill="url(#areaGrad)" />
-                    {/* Line */}
-                    <path d={linePath} fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    {/* Data points */}
-                    {points.map((p, i) => (
-                      <g key={i}>
-                        <circle cx={p.x} cy={p.y} r="4" fill="#F97316" stroke="white" strokeWidth="2" />
-                        {p.total > 0 && (
-                          <text
-                            x={p.x}
-                            y={p.y - 10}
-                            textAnchor="middle"
-                            className="fill-slate-700"
-                            fontSize="8"
-                            fontWeight="700"
-                          >
-                            {(p.total / 1000).toFixed(0)}K
-                          </text>
-                        )}
-                      </g>
-                    ))}
-                  </>
-                );
-              })()}
-
-              {/* X-axis labels */}
-              {monthLabels.map((label, i) => {
-                const x = 45 + i * ((310 - 45) / Math.max(monthLabels.length - 1, 1));
-                return (
-                  <text
-                    key={i}
-                    x={x}
-                    y="168"
-                    textAnchor="middle"
-                    className="fill-slate-500"
-                    fontSize="9"
-                    fontWeight="600"
-                  >
-                    {label}
-                  </text>
-                );
-              })}
-            </svg>
+            <MonthlySpendingChart data={monthlyTrend} />
           </Card>
         </section>
       )}

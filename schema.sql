@@ -1,5 +1,5 @@
 -- ============================================================
--- Rapido by QI Tyrix — Database Schema (Phase 3)
+-- Rapido by QI Tyrix — Database Schema (Idempotent & Safe)
 -- Run this in the Supabase SQL Editor
 -- ============================================================
 
@@ -7,27 +7,38 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
--- ENUM TYPES
+-- ENUM TYPES (Safe to re-run; will not throw ERROR 42710)
 -- ============================================================
 
-CREATE TYPE project_type AS ENUM ('Renovation', 'Maintenance', 'New Build');
-CREATE TYPE project_status AS ENUM ('active', 'completed');
-CREATE TYPE expense_category AS ENUM (
-  'Materials',
-  'Labor',
-  'Equipment Rental',
-  'Plumbing',
-  'Electricity',
-  'Permits',
-  'Transport/Fuel',
-  'Misc'
-);
+DO $$ BEGIN
+  CREATE TYPE project_type AS ENUM ('Renovation', 'Maintenance', 'New Build');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE project_status AS ENUM ('active', 'completed');
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE expense_category AS ENUM (
+    'Materials',
+    'Labor',
+    'Equipment Rental',
+    'Plumbing',
+    'Electricity',
+    'Permits',
+    'Transport/Fuel',
+    'Misc'
+  );
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;
 
 -- ============================================================
 -- PROJECTS TABLE
 -- ============================================================
 
-CREATE TABLE projects (
+CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   type project_type NOT NULL,
@@ -42,7 +53,7 @@ CREATE TABLE projects (
 -- EXPENSES TABLE
 -- ============================================================
 
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   amount NUMERIC(12, 2) NOT NULL,
@@ -51,32 +62,36 @@ CREATE TABLE expenses (
   receipt_url TEXT,
   description TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMPTZ             -- Phase 3: soft-delete instead of hard DELETE
+  deleted_at TIMESTAMPTZ             -- Soft-delete timestamp
 );
 
--- ============================================================
--- INDEXES
--- ============================================================
-
-CREATE INDEX idx_expenses_project_id ON expenses(project_id);
-CREATE INDEX idx_projects_status ON projects(status);
-CREATE INDEX idx_expenses_date ON expenses(date);
-CREATE INDEX idx_expenses_deleted_at ON expenses(deleted_at);
+-- Ensure deleted_at column exists if table was created in an earlier migration
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- ============================================================
--- ROW LEVEL SECURITY — Disabled for single-user MVP
--- (Enable + add policies when adding auth in future)
+-- INDEXES (Safe to re-run)
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS idx_expenses_project_id ON expenses(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+CREATE INDEX IF NOT EXISTS idx_expenses_deleted_at ON expenses(deleted_at);
+
+-- ============================================================
+-- ROW LEVEL SECURITY — Permissive for single-user MVP
 -- ============================================================
 
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations for anon (single-user, no auth)
-CREATE POLICY "Allow all for anon" ON projects FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for anon" ON expenses FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow all for anon" ON projects;
+  CREATE POLICY "Allow all for anon" ON projects FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
 
--- ============================================================
--- Phase 3 Migration (run if tables already exist from Phase 2)
--- ============================================================
--- ALTER TABLE expenses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
--- CREATE INDEX IF NOT EXISTS idx_expenses_deleted_at ON expenses(deleted_at);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow all for anon" ON expenses;
+  CREATE POLICY "Allow all for anon" ON expenses FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;

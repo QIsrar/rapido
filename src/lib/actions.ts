@@ -16,9 +16,22 @@ import {
   expenses as fallbackExpenses,
 } from './placeholder-data';
 
+const NOT_CONFIGURED_MSG =
+  'Database not connected. Please verify your Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, or SUPABASE_URL and SUPABASE_ANON_KEY) in Vercel project settings, then redeploy.';
+
+function formatErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) {
+    if (err.message.includes('fetch failed')) {
+      return 'Supabase connection failed (fetch failed). Please check that your Supabase project is active and that your Supabase URL & Key are set in Vercel, then trigger a redeploy.';
+    }
+    return err.message;
+  }
+  return fallback;
+}
+
 /**
  * Fetch all projects from Supabase with their associated expenses and calculated total_spent.
- * Falls back gracefully to seed data if Supabase tables have not been created yet.
+ * Falls back gracefully to seed data if Supabase is not connected or tables not yet created.
  */
 export async function getProjects(): Promise<{
   projects: ProjectWithExpenses[];
@@ -31,6 +44,7 @@ export async function getProjects(): Promise<{
         isLive: false,
       };
     }
+
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('*')
@@ -38,7 +52,6 @@ export async function getProjects(): Promise<{
 
     if (projectsError) {
       console.warn('Supabase projects query notice:', projectsError.message);
-      // Fallback to placeholder data
       return {
         projects: getFallbackProjectsWithExpenses(),
         isLive: false,
@@ -105,9 +118,7 @@ export async function getProjectById(
       .single();
 
     if (projectError || !project) {
-      // Check fallback data
-      const fallback = getFallbackProjectsWithExpenses().find((p) => p.id === id);
-      return fallback || null;
+      return null;
     }
 
     let { data: expenses, error: expensesError } = await supabase
@@ -117,7 +128,7 @@ export async function getProjectById(
       .is('deleted_at', null)
       .order('date', { ascending: false });
 
-    // Backward-compatible fallback if deleted_at column does not exist yet in Supabase
+    // Fallback if deleted_at does not exist yet
     if (expensesError && expensesError.message?.includes('deleted_at')) {
       const retry = await supabase
         .from('expenses')
@@ -125,27 +136,28 @@ export async function getProjectById(
         .eq('project_id', id)
         .order('date', { ascending: false });
       expenses = retry.data;
-      expensesError = retry.error;
     }
 
-    const pExpenses: Expense[] = expensesError || !expenses ? [] : expenses;
-    const total_spent = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const expensesList: Expense[] = expenses || [];
+    const total_spent = expensesList.reduce(
+      (sum, e) => sum + Number(e.amount),
+      0
+    );
 
     return {
       ...project,
-      expenses: pExpenses,
+      expenses: expensesList,
       total_spent,
     };
   } catch (err) {
     console.error('getProjectById error:', err);
-    const fallback = getFallbackProjectsWithExpenses().find((p) => p.id === id);
-    return fallback || null;
+    return null;
   }
 }
 
 /**
  * Create a new project.
- * Automatically sets `start_date` to now and status to 'active'.
+ * Start date is automatically recorded as now.
  */
 export async function createProject(formData: {
   name: string;
@@ -153,6 +165,10 @@ export async function createProject(formData: {
   total_budget: number;
 }): Promise<{ success: boolean; data?: Project; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     const name = formData.name?.trim();
     if (!name) {
       return { success: false, error: 'Project name is required.' };
@@ -193,7 +209,7 @@ export async function createProject(formData: {
     console.error('createProject exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error creating project',
+      error: formatErrorMessage(err, 'Unknown error creating project'),
     };
   }
 }
@@ -206,6 +222,10 @@ export async function completeProject(
   id: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     if (!id || typeof id !== 'string') {
       return { success: false, error: 'Valid project ID is required.' };
     }
@@ -232,7 +252,7 @@ export async function completeProject(
     console.error('completeProject exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error completing project',
+      error: formatErrorMessage(err, 'Unknown error completing project'),
     };
   }
 }
@@ -240,6 +260,7 @@ export async function completeProject(
 /**
  * Create a new expense.
  * Automatically defaults to today's date if not specified.
+ * When category is 'Misc', a description/name is strictly required.
  */
 export async function createExpense(formData: {
   project_id: string;
@@ -250,6 +271,10 @@ export async function createExpense(formData: {
   date?: string;
 }): Promise<{ success: boolean; data?: Expense; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     if (!formData.project_id || typeof formData.project_id !== 'string') {
       return { success: false, error: 'Valid project ID is required.' };
     }
@@ -261,12 +286,22 @@ export async function createExpense(formData: {
       return { success: false, error: 'Invalid expense category.' };
     }
 
+    const trimmedDescription = formData.description?.trim() || '';
+
+    // Enforce required description for Misc category
+    if (formData.category === 'Misc' && !trimmedDescription) {
+      return {
+        success: false,
+        error: 'Description / Item Name is required for Miscellaneous (Misc) expenses.',
+      };
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const newExpense = {
       project_id: formData.project_id,
       amount,
       category: formData.category,
-      description: formData.description?.trim() || formData.category,
+      description: trimmedDescription || formData.category,
       receipt_url: formData.receipt_url || null,
       date: formData.date || todayStr,
       created_at: new Date().toISOString(),
@@ -286,12 +321,76 @@ export async function createExpense(formData: {
     revalidatePath('/');
     revalidatePath('/projects');
     revalidatePath(`/projects/${formData.project_id}`);
+    revalidatePath('/reports');
     return { success: true, data };
   } catch (err: unknown) {
     console.error('createExpense exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Unknown error creating expense',
+      error: formatErrorMessage(err, 'Unknown error creating expense'),
+    };
+  }
+}
+
+/**
+ * Upload receipt via Server Action using buffer.
+ * Ensures uploads succeed on Vercel even if client env vars are missing.
+ */
+export async function uploadReceiptAction(
+  formData: FormData
+): Promise<{ url: string | null; error: string | null }> {
+  try {
+    if (!isSupabaseConfigured) {
+      return { url: null, error: 'Supabase storage is not configured.' };
+    }
+
+    const file = formData.get('file') as File | null;
+    const expenseId = formData.get('expenseId') as string | null;
+
+    if (!file || !expenseId) {
+      return { url: null, error: 'File and expense ID are required.' };
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      return { url: null, error: 'File too large. Maximum size is 5MB.' };
+    }
+
+    if (!file.type.startsWith('image/')) {
+      return { url: null, error: 'Only image files are allowed.' };
+    }
+
+    const rawExt = file.name.split('.').pop() || 'jpg';
+    const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const timestamp = Date.now();
+    const sanitizedExpenseId = expenseId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const path = `${sanitizedExpenseId}-${timestamp}.${ext}`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(path, buffer, {
+        contentType: file.type,
+        cacheControl: '31536000',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('uploadReceiptAction error:', uploadError);
+      return { url: null, error: uploadError.message };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('receipts')
+      .getPublicUrl(path);
+
+    return { url: publicUrlData.publicUrl, error: null };
+  } catch (err: unknown) {
+    console.error('uploadReceiptAction exception:', err);
+    return {
+      url: null,
+      error: err instanceof Error ? err.message : 'Upload failed',
     };
   }
 }
@@ -301,6 +400,10 @@ export async function createExpense(formData: {
  */
 export async function seedDemoData(): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     for (const p of fallbackProjects) {
       const { data: newProj, error: pErr } = await supabase
         .from('projects')
@@ -340,12 +443,13 @@ export async function seedDemoData(): Promise<{ success: boolean; count?: number
 
     revalidatePath('/');
     revalidatePath('/projects');
+    revalidatePath('/reports');
     return { success: true };
   } catch (err: unknown) {
     console.error('seedDemoData exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Failed to seed sample data',
+      error: formatErrorMessage(err, 'Failed to seed sample data'),
     };
   }
 }
@@ -358,6 +462,10 @@ export async function updateExpenseReceipt(
   receiptUrl: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     if (!expenseId || !receiptUrl) {
       return { success: false, error: 'Expense ID and receipt URL are required.' };
     }
@@ -374,12 +482,13 @@ export async function updateExpenseReceipt(
 
     revalidatePath('/');
     revalidatePath('/projects');
+    revalidatePath('/reports');
     return { success: true };
   } catch (err: unknown) {
     console.error('updateExpenseReceipt exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Failed to update receipt',
+      error: formatErrorMessage(err, 'Failed to update receipt'),
     };
   }
 }
@@ -393,6 +502,10 @@ export async function softDeleteExpense(
   projectId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
     if (!expenseId) {
       return { success: false, error: 'Valid expense ID is required.' };
     }
@@ -420,12 +533,13 @@ export async function softDeleteExpense(
     revalidatePath('/');
     revalidatePath('/projects');
     revalidatePath(`/projects/${projectId}`);
+    revalidatePath('/reports');
     return { success: true };
   } catch (err: unknown) {
     console.error('softDeleteExpense exception:', err);
     return {
       success: false,
-      error: err instanceof Error ? err.message : 'Failed to delete expense',
+      error: formatErrorMessage(err, 'Failed to delete expense'),
     };
   }
 }
@@ -435,8 +549,8 @@ export async function softDeleteExpense(
  */
 export interface ReportsData {
   categoryTotals: { category: string; total: number }[];
-  monthlyTrend: { month: string; total: number }[];
-  budgetVsActual: { name: string; budget: number; spent: number }[];
+  monthlyTrend: { month: string; total: number; count: number }[];
+  budgetVsActual: { name: string; fullName: string; budget: number; spent: number }[];
   quickStats: {
     totalProjects: number;
     totalLifetimeSpend: number;
@@ -460,29 +574,33 @@ export async function getReportsData(): Promise<ReportsData> {
     .sort((a, b) => b.total - a.total);
 
   // Monthly spending trend (last 6 months)
-  const monthMap: Record<string, number> = {};
+  const monthMap: Record<string, { total: number; count: number }> = {};
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    monthMap[key] = 0;
+    monthMap[key] = { total: 0, count: 0 };
   }
   for (const e of allExpenses) {
     const key = e.date.substring(0, 7); // YYYY-MM
     if (key in monthMap) {
-      monthMap[key] += Number(e.amount);
+      monthMap[key].total += Number(e.amount);
+      monthMap[key].count += 1;
     }
   }
-  const monthlyTrend = Object.entries(monthMap).map(([month, total]) => ({
+  const monthlyTrend = Object.entries(monthMap).map(([month, val]) => ({
     month,
-    total,
+    total: val.total,
+    count: val.count,
   }));
 
-  // Budget vs Actual per project (active projects only)
+  // Budget vs Actual per project (active projects first, up to 10)
   const budgetVsActual = projects
-    .filter((p) => p.status === 'active')
+    .filter((p) => p.total_budget > 0)
+    .slice(0, 8)
     .map((p) => ({
-      name: p.name.length > 18 ? p.name.substring(0, 18) + '…' : p.name,
+      name: p.name.length > 14 ? p.name.substring(0, 14) + '…' : p.name,
+      fullName: p.name,
       budget: Number(p.total_budget),
       spent: p.total_spent,
     }));
@@ -510,10 +628,41 @@ export async function getReportsData(): Promise<ReportsData> {
   };
 }
 
+/**
+ * Diagnostic ping test for Supabase connection.
+ */
+export async function testDatabaseConnection(): Promise<{
+  connected: boolean;
+  projectCount?: number;
+  error?: string;
+}> {
+  try {
+    if (!isSupabaseConfigured) {
+      return {
+        connected: false,
+        error: 'Missing environment variables. Please check Vercel settings.',
+      };
+    }
+    const { count, error } = await supabase
+      .from('projects')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      return { connected: false, error: error.message };
+    }
+    return { connected: true, projectCount: count ?? 0 };
+  } catch (err: unknown) {
+    return {
+      connected: false,
+      error: formatErrorMessage(err, 'Connection failed'),
+    };
+  }
+}
+
 function getFallbackProjectsWithExpenses(): ProjectWithExpenses[] {
   return fallbackProjects.map((p) => {
     const pExpenses = fallbackExpenses.filter((e) => e.project_id === p.id);
-    const total_spent = pExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const total_spent = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
     return {
       ...p,
       expenses: pExpenses,
@@ -521,3 +670,4 @@ function getFallbackProjectsWithExpenses(): ProjectWithExpenses[] {
     };
   });
 }
+

@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Camera, Plus, Loader2, X, ImageIcon } from 'lucide-react';
 import { EXPENSE_CATEGORIES, type ExpenseCategory, type Project } from '@/types/database';
-import { createExpense, updateExpenseReceipt } from '@/lib/actions';
+import { createExpense, updateExpenseReceipt, uploadReceiptAction } from '@/lib/actions';
 import { uploadReceipt } from '@/lib/storage';
 
 interface AddExpenseDialogProps {
@@ -33,9 +33,10 @@ export function AddExpenseDialog({
 }: AddExpenseDialogProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState('');
   const [projectId, setProjectId] = useState(defaultProjectId);
+  const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('Materials');
   const [description, setDescription] = useState('');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
@@ -49,22 +50,20 @@ export function AddExpenseDialog({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg('Only image files are allowed.');
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Receipt image must be under 5MB.');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('File too large. Maximum size is 5MB.');
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Only image files are supported.');
       return;
     }
 
     setReceiptFile(file);
-    setErrorMsg('');
-
-    // Generate preview
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      setReceiptPreview(ev.target?.result as string);
+    reader.onload = () => {
+      setReceiptPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -92,6 +91,11 @@ export function AddExpenseDialog({
       return;
     }
 
+    if (category === 'Misc' && !description.trim()) {
+      setErrorMsg('Item name / description is required for Misc expenses.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // 1. Create the expense record
@@ -110,12 +114,30 @@ export function AddExpenseDialog({
 
       // 2. Upload receipt if provided
       if (receiptFile && res.data.id) {
-        const uploadResult = await uploadReceipt(receiptFile, res.data.id);
-        if (uploadResult.url) {
-          await updateExpenseReceipt(res.data.id, uploadResult.url);
-        } else if (uploadResult.error) {
-          // Non-blocking: expense was created, but receipt failed
-          console.warn('Receipt upload failed:', uploadResult.error);
+        let uploadedUrl: string | null = null;
+
+        // Try server action first
+        try {
+          const fd = new FormData();
+          fd.append('file', receiptFile);
+          fd.append('expenseId', res.data.id);
+          const srvRes = await uploadReceiptAction(fd);
+          if (srvRes.url) {
+            uploadedUrl = srvRes.url;
+          }
+        } catch {
+          // Fallback to client-side upload
+        }
+
+        if (!uploadedUrl) {
+          const clientRes = await uploadReceipt(receiptFile, res.data.id);
+          if (clientRes.url) {
+            uploadedUrl = clientRes.url;
+          }
+        }
+
+        if (uploadedUrl) {
+          await updateExpenseReceipt(res.data.id, uploadedUrl);
         }
       }
 
@@ -250,20 +272,36 @@ export function AddExpenseDialog({
               </div>
             </div>
 
-            {/* Description */}
+            {/* Description / Item Name */}
             <div className="space-y-1.5">
               <Label
                 htmlFor="description"
-                className="text-xs font-semibold text-slate-700"
+                className="text-xs font-semibold text-slate-700 flex items-center justify-between"
               >
-                Description (optional)
+                <span>
+                  {category === 'Misc' ? 'Item Name / Description *' : 'Description (optional)'}
+                </span>
+                {category === 'Misc' && (
+                  <span className="text-[10px] text-orange-600 font-bold uppercase tracking-wider bg-orange-100/70 px-1.5 py-0.5 rounded">
+                    Required for Misc
+                  </span>
+                )}
               </Label>
               <Input
                 id="description"
-                placeholder="e.g. 50 bags Fauji cement from supplier"
+                placeholder={
+                  category === 'Misc'
+                    ? 'e.g. Tea & snacks for laborers, site rope, nails'
+                    : 'e.g. 50 bags Fauji cement from supplier'
+                }
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="h-12 rounded-xl border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400"
+                required={category === 'Misc'}
+                className={`h-12 rounded-xl border-slate-200 bg-slate-50/50 text-sm text-slate-900 placeholder:text-slate-400 ${
+                  category === 'Misc' && !description.trim()
+                    ? 'border-orange-400 ring-1 ring-orange-200 bg-orange-50/20'
+                    : ''
+                }`}
               />
             </div>
 

@@ -48,3 +48,6 @@ CLAUDE.md
 .claude
 .claude/
 *.agent.md
+test-results/
+playwright-report/
+
