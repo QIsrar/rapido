@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import {
   ExternalLink,
@@ -24,17 +25,29 @@ export default async function AboutPage() {
   return (
     <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 animate-fade-in">
       {/* Header */}
-      <header className="pt-4 pb-5">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-black uppercase tracking-wider mb-2">
-          <Sparkles className="w-3.5 h-3.5 text-orange-600" />
-          Rapido v2.4
+      <header className="pt-4 pb-5 flex items-center gap-3.5">
+        <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-orange-500 shadow-md shadow-orange-500/15 shrink-0 bg-white p-0.5">
+          <Image
+            src="/logo.png"
+            alt="Rapido Construction Logo"
+            width={56}
+            height={56}
+            className="w-full h-full object-contain rounded-xl"
+            priority
+          />
         </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-          About &amp; Developer
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Job-costing platform engineered by QI Tyrix for construction contractors
-        </p>
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] font-black uppercase tracking-wider mb-1">
+            <Sparkles className="w-3 h-3 text-orange-600" />
+            Rapido v2.4
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">
+            About &amp; Developer
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Engineered by QI Tyrix for construction contractors
+          </p>
+        </div>
       </header>
 
       <div className="space-y-4">

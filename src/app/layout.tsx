@@ -10,9 +10,38 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Rapido by QI Tyrix',
+  metadataBase: new URL('https://rapido-henna.vercel.app'),
+  title: 'Rapido — Construction Job-Costing & Expense Tracker',
   description:
-    'Construction job-costing app — track budgets, log expenses, snap receipts.',
+    'Track project budgets, log construction expenses, snap receipts, and audit site costs in PKR. Engineered by QI Tyrix.',
+  openGraph: {
+    title: 'Rapido — Construction Job-Costing & Expense Tracker',
+    description:
+      'Track project budgets, log construction expenses, snap receipts, and audit site costs in PKR. Engineered by QI Tyrix.',
+    url: 'https://rapido-henna.vercel.app',
+    siteName: 'Rapido Construction',
+    images: [
+      {
+        url: '/og-image.jpg',
+        width: 1024,
+        height: 1024,
+        alt: 'Rapido Construction Logo',
+      },
+    ],
+    locale: 'en_PK',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Rapido — Construction Job-Costing & Expense Tracker',
+    description:
+      'Track project budgets, log construction expenses, snap receipts, and audit site costs in PKR. Engineered by QI Tyrix.',
+    images: ['/og-image.jpg'],
+  },
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

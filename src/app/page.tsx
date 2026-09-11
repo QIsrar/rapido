@@ -1,8 +1,10 @@
+import Image from 'next/image';
 import { Briefcase, TrendingUp, AlertTriangle, Database } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { ProjectCard } from '@/components/project-card';
 import { AddExpenseDialog } from '@/components/add-expense-dialog';
 import { AddProjectDialog } from '@/components/add-project-dialog';
+import { DashboardBanner } from '@/components/dashboard-banner';
 import { SeedButton } from '@/components/seed-button';
 import { getProjects } from '@/lib/actions';
 import { formatPKR } from '@/lib/utils';
@@ -44,25 +46,40 @@ export default async function DashboardPage() {
   return (
     <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
       {/* Header */}
-      <header className="pt-4 pb-4 flex items-start justify-between animate-fade-in">
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {dateStr}
-          </p>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-            {greeting} 👷
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Rapido by <a href="https://qi-tyrix.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-orange-600 font-bold hover:underline">QI Tyrix</a>
-          </p>
+      <header className="pt-4 pb-4 flex items-center justify-between animate-fade-in">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-orange-500 shadow-md shadow-orange-500/15 shrink-0 bg-white p-0.5">
+            <Image
+              src="/logo.png"
+              alt="Rapido Construction Logo"
+              width={48}
+              height={48}
+              className="w-full h-full object-contain rounded-xl"
+              priority
+            />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              {dateStr}
+            </p>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">
+              {greeting} 👷
+            </h1>
+            <p className="text-xs text-slate-500">
+              Rapido by <a href="https://qi-tyrix.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-orange-600 font-bold hover:underline">QI Tyrix</a>
+            </p>
+          </div>
         </div>
 
         {/* Quick Add Project Button */}
-        <div className="pt-1 flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {allProjects.length === 0 && <SeedButton />}
           <AddProjectDialog buttonVariant="primary" />
         </div>
       </header>
+
+      {/* Deleted Project Notification Banner */}
+      <DashboardBanner />
 
       {/* Database Connection Notice if SQL not yet run in Supabase */}
       {!isLive && (

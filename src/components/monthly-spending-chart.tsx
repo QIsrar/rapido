@@ -43,7 +43,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
   const activeItem = hoveredIndex !== null ? data[hoveredIndex] : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 select-none">
       {/* Responsive Bar Columns at top */}
       <div className="grid grid-cols-6 gap-2 items-end h-44 pt-4 px-1">
         {data.map((item, index) => {
@@ -53,14 +53,21 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
           return (
             <div
               key={item.month}
-              onMouseEnter={() => setHoveredIndex(index)}
-              onMouseLeave={() => setHoveredIndex(null)}
-              onClick={() => setHoveredIndex(index === hoveredIndex ? null : index)}
-              className="flex flex-col items-center justify-end h-full group cursor-pointer"
+              className={`flex flex-col items-center justify-end h-full relative rounded-xl p-1 transition-colors duration-150 ${
+                isHovered ? 'bg-orange-50/80' : 'hover:bg-slate-50'
+              }`}
             >
-              {/* Value on top of bar */}
+              {/* Isolated Hitbox Overlay */}
+              <div
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                onClick={() => setHoveredIndex(index === hoveredIndex ? null : index)}
+                className="absolute inset-0 z-30 cursor-pointer"
+              />
+
+              {/* Value on top of bar — pointer-events-none */}
               <span
-                className={`text-[9px] font-bold mb-1 transition-all ${
+                className={`text-[9px] font-bold mb-1 transition-all pointer-events-none ${
                   isHovered
                     ? 'text-orange-600 font-black'
                     : item.total > 0
@@ -77,23 +84,23 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
                   : '-'}
               </span>
 
-              {/* Bar */}
-              <div className="w-full max-w-[40px] bg-slate-100 rounded-t-lg relative flex items-end justify-center overflow-hidden h-32">
+              {/* Bar — pointer-events-none */}
+              <div className="w-full max-w-[40px] bg-slate-100 rounded-t-lg relative flex items-end justify-center overflow-hidden h-32 pointer-events-none">
                 <div
-                  className={`w-full rounded-t-lg transition-all duration-200 ${
+                  className={`w-full rounded-t-lg transition-all duration-150 ${
                     isHovered
-                      ? 'bg-gradient-to-t from-orange-600 to-amber-400 shadow-md ring-2 ring-orange-400/50'
+                      ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-md'
                       : item.total > 0
-                      ? 'bg-gradient-to-t from-orange-500 to-amber-400 group-hover:from-orange-600 group-hover:to-amber-400'
+                      ? 'bg-gradient-to-t from-orange-500 to-amber-400'
                       : 'bg-slate-200'
                   }`}
                   style={{ height: `${heightPct}%` }}
                 />
               </div>
 
-              {/* Month Label */}
+              {/* Month Label — pointer-events-none */}
               <span
-                className={`text-[10px] mt-2 font-bold uppercase tracking-wider transition-colors ${
+                className={`text-[10px] mt-2 font-bold uppercase tracking-wider transition-colors pointer-events-none ${
                   isHovered ? 'text-orange-600 font-black' : 'text-slate-500'
                 }`}
               >
@@ -104,30 +111,30 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
         })}
       </div>
 
-      {/* Interactive Tooltip Card placed below bars so no layout shift occurs */}
-      <div className="min-h-[75px]">
+      {/* Fixed-height Interactive Tooltip Card placed below bars so no layout shift occurs */}
+      <div className="h-20 w-full">
         {activeItem ? (
-          <div className="p-3.5 rounded-2xl bg-slate-900 text-white shadow-md animate-in fade-in duration-200">
-            <div className="flex items-center justify-between mb-1">
+          <div className="h-full p-3.5 rounded-2xl bg-slate-900 text-white shadow-md flex flex-col justify-between animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-black text-orange-400 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
                 {formatFullMonth(activeItem.month)}
               </span>
               <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full">
                 {lifetimePeriodSpend > 0
-                  ? `${Math.round((activeItem.total / lifetimePeriodSpend) * 100)}% of 6-mo total`
+                  ? `${Math.round((activeItem.total / lifetimePeriodSpend) * 100)}% of total`
                   : '0%'}
               </span>
             </div>
-            <div className="flex items-baseline justify-between pt-1.5 border-t border-slate-800">
+            <div className="flex items-baseline justify-between pt-1 border-t border-slate-800">
               <div>
-                <span className="text-[10px] text-slate-400 font-bold block">Total Spend</span>
+                <span className="text-[10px] text-slate-400 font-bold block leading-none">Total Spend</span>
                 <span className="text-base font-black text-white">
                   {formatPKR(activeItem.total)}
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-slate-400 font-bold block">Transactions</span>
+                <span className="text-[10px] text-slate-400 font-bold block leading-none">Transactions</span>
                 <span className="text-xs font-bold text-slate-300">
                   {activeItem.count} {activeItem.count === 1 ? 'expense' : 'expenses'}
                 </span>
@@ -135,8 +142,8 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
             </div>
           </div>
         ) : (
-          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-center text-xs text-slate-500 font-medium">
-            💡 <strong className="text-slate-700">Interactive Trend:</strong> Hover or tap on any month column above to inspect spending details.
+          <div className="h-full p-3 rounded-xl bg-slate-50 border border-slate-200/60 text-center text-xs text-slate-500 font-medium flex items-center justify-center">
+            <span>💡 <strong className="text-slate-700">Interactive Trend:</strong> Hover or tap on any month column above to inspect spending details.</span>
           </div>
         )}
       </div>

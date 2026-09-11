@@ -244,13 +244,16 @@ export function AddExpenseDialog({
         }
       }
 
-      // Success — reset form
+      // Success — save target project ID and reset form
+      const targetProjectId = projectId;
       setAmount('');
       setDescription('');
       clearReceipt();
       if (!defaultProjectId) setProjectId('');
       setOpen(false);
+
       startTransition(() => {
+        router.push(`/projects/${targetProjectId}`);
         router.refresh();
       });
     } catch (err: unknown) {
