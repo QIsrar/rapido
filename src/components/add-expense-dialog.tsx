@@ -93,10 +93,8 @@ export function AddExpenseDialog({
     }
   }, [defaultProjectId, open, localProjects]);
 
-  // Allow active projects plus the default project if passed
-  const availableProjects = localProjects.filter(
-    (p) => p.status === 'active' || p.id === defaultProjectId
-  );
+  // Only active projects can accept new expenses
+  const availableProjects = localProjects.filter((p) => p.status === 'active');
 
   const selectedProject = localProjects.find((p) => p.id === projectId);
 
@@ -189,6 +187,11 @@ export function AddExpenseDialog({
 
     if (!projectId) {
       setErrorMsg('Please select a project or create one first.');
+      return;
+    }
+
+    if (selectedProject?.status === 'completed') {
+      setErrorMsg('This project is marked as completed and locked. You cannot log expenses to completed projects.');
       return;
     }
 

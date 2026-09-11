@@ -384,6 +384,20 @@ export async function createExpense(formData: {
       };
     }
 
+    // Verify project is active (completed projects are sealed)
+    const { data: projectCheck } = await supabase
+      .from('projects')
+      .select('status')
+      .eq('id', formData.project_id)
+      .single();
+
+    if (projectCheck && projectCheck.status === 'completed') {
+      return {
+        success: false,
+        error: 'This project is marked as completed and locked. New expenses cannot be added.',
+      };
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
     const newExpense = {
       project_id: formData.project_id,

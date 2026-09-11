@@ -278,11 +278,30 @@ export default async function ProjectDetailsPage({
         </Card>
       </section>
 
-      {/* Floating Action Button pre-configured for this project */}
-      <AddExpenseDialog
-        projects={[project]}
-        defaultProjectId={project.id}
-      />
+      {/* Floating Action Button only for active projects */}
+      {!isCompleted ? (
+        <AddExpenseDialog
+          projects={[project]}
+          defaultProjectId={project.id}
+        />
+      ) : (
+        <div className="fixed bottom-20 inset-x-4 max-w-md mx-auto z-30 animate-slide-up">
+          <div className="p-3.5 rounded-2xl bg-slate-950/90 backdrop-blur-md text-white border-2 border-emerald-500/40 shadow-2xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-white">Project Completed &amp; Sealed</p>
+                <p className="text-[11px] text-slate-400 truncate">Financial records are locked against new expenses</p>
+              </div>
+            </div>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-wider shrink-0 border border-emerald-500/30">
+              Audited
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
