@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ExpenseRow } from '@/components/expense-row';
 import { CompleteProjectButton } from '@/components/complete-project-button';
+import { DeleteProjectButton } from '@/components/delete-project-button';
 import { AddExpenseDialog } from '@/components/add-expense-dialog';
 import { getProjectById } from '@/lib/actions';
 import { formatPKR } from '@/lib/utils';
@@ -93,17 +94,24 @@ export default async function ProjectDetailsPage({
           Back
         </Link>
 
-        {!isCompleted ? (
-          <CompleteProjectButton
+        <div className="flex items-center gap-2">
+          <DeleteProjectButton
             projectId={project.id}
             projectName={project.name}
+            expensesCount={project.expenses.length}
           />
-        ) : (
-          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 text-xs px-2.5 py-1">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-            Completed
-          </Badge>
-        )}
+          {!isCompleted ? (
+            <CompleteProjectButton
+              projectId={project.id}
+              projectName={project.name}
+            />
+          ) : (
+            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 gap-1 text-xs px-2.5 py-1">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              Completed
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Project Header */}
@@ -271,7 +279,7 @@ export default async function ProjectDetailsPage({
                 key={expense.id}
                 className={i % 2 === 1 ? 'bg-slate-50/50 -mx-2 px-2 rounded-lg' : ''}
               >
-                <ExpenseRow expense={expense} />
+                <ExpenseRow expense={expense} showDelete={!isCompleted} />
               </div>
             ))
           )}

@@ -28,7 +28,8 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 min-w-[56px] min-h-[48px] rounded-xl transition-all duration-200 tap-scale ${
+              prefetch={true}
+              className={`relative flex flex-col items-center gap-0.5 px-4 py-1.5 min-w-[56px] min-h-[48px] rounded-xl transition-all duration-200 tap-scale cursor-pointer ${
                 isActive
                   ? 'text-orange-600 font-semibold'
                   : 'text-slate-400 hover:text-slate-700'

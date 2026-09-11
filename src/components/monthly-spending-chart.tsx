@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { formatPKR } from '@/lib/utils';
-import { Calendar, DollarSign, Receipt } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface MonthlyItem {
   month: string; // YYYY-MM
@@ -44,42 +44,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
 
   return (
     <div className="space-y-4">
-      {/* Interactive Tooltip Card */}
-      {activeItem ? (
-        <div className="p-3 rounded-xl bg-slate-900 text-white shadow-md animate-fade-in transition-all">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-bold text-orange-400 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5" />
-              {formatFullMonth(activeItem.month)}
-            </span>
-            <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-              {lifetimePeriodSpend > 0
-                ? `${Math.round((activeItem.total / lifetimePeriodSpend) * 100)}% of 6-mo total`
-                : '0%'}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between pt-1 border-t border-slate-800">
-            <div>
-              <span className="text-[10px] text-slate-400 block">Total Spend</span>
-              <span className="text-base font-extrabold text-white">
-                {formatPKR(activeItem.total)}
-              </span>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] text-slate-400 block">Transactions</span>
-              <span className="text-xs font-bold text-slate-300">
-                {activeItem.count} {activeItem.count === 1 ? 'expense' : 'expenses'}
-              </span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-center text-xs text-slate-500">
-          <span className="font-semibold text-slate-700">💡 Interactive Trend:</span> Hover or tap on any month column to inspect spending details.
-        </div>
-      )}
-
-      {/* Responsive Bar Columns */}
+      {/* Responsive Bar Columns at top */}
       <div className="grid grid-cols-6 gap-2 items-end h-44 pt-4 px-1">
         {data.map((item, index) => {
           const heightPct = Math.max((item.total / maxTotal) * 100, 4);
@@ -97,7 +62,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
               <span
                 className={`text-[9px] font-bold mb-1 transition-all ${
                   isHovered
-                    ? 'text-orange-600 scale-110'
+                    ? 'text-orange-600 font-black'
                     : item.total > 0
                     ? 'text-slate-600'
                     : 'text-slate-300'
@@ -115,7 +80,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
               {/* Bar */}
               <div className="w-full max-w-[40px] bg-slate-100 rounded-t-lg relative flex items-end justify-center overflow-hidden h-32">
                 <div
-                  className={`w-full rounded-t-lg transition-all duration-300 ${
+                  className={`w-full rounded-t-lg transition-all duration-200 ${
                     isHovered
                       ? 'bg-gradient-to-t from-orange-600 to-amber-400 shadow-md ring-2 ring-orange-400/50'
                       : item.total > 0
@@ -129,7 +94,7 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
               {/* Month Label */}
               <span
                 className={`text-[10px] mt-2 font-bold uppercase tracking-wider transition-colors ${
-                  isHovered ? 'text-orange-600' : 'text-slate-500'
+                  isHovered ? 'text-orange-600 font-black' : 'text-slate-500'
                 }`}
               >
                 {formatMonthLabel(item.month)}
@@ -137,6 +102,43 @@ export function MonthlySpendingChart({ data }: MonthlySpendingChartProps) {
             </div>
           );
         })}
+      </div>
+
+      {/* Interactive Tooltip Card placed below bars so no layout shift occurs */}
+      <div className="min-h-[75px]">
+        {activeItem ? (
+          <div className="p-3.5 rounded-2xl bg-slate-900 text-white shadow-md animate-in fade-in duration-200">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-black text-orange-400 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                {formatFullMonth(activeItem.month)}
+              </span>
+              <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-2.5 py-0.5 rounded-full">
+                {lifetimePeriodSpend > 0
+                  ? `${Math.round((activeItem.total / lifetimePeriodSpend) * 100)}% of 6-mo total`
+                  : '0%'}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between pt-1.5 border-t border-slate-800">
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold block">Total Spend</span>
+                <span className="text-base font-black text-white">
+                  {formatPKR(activeItem.total)}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-slate-400 font-bold block">Transactions</span>
+                <span className="text-xs font-bold text-slate-300">
+                  {activeItem.count} {activeItem.count === 1 ? 'expense' : 'expenses'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 text-center text-xs text-slate-500 font-medium">
+            💡 <strong className="text-slate-700">Interactive Trend:</strong> Hover or tap on any month column above to inspect spending details.
+          </div>
+        )}
       </div>
     </div>
   );

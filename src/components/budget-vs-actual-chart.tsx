@@ -34,7 +34,7 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
     );
   }
 
-  // Active item: prioritized by hover, falls back to locked selection
+  // Active item: hover takes priority, otherwise locked selection
   const activeIndex = hoveredIndex !== null ? hoveredIndex : selectedIndex;
   const activeItem = activeIndex !== null ? data[activeIndex] : null;
 
@@ -53,92 +53,9 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
 
   return (
     <div className="space-y-4">
-      {/* Dynamic Interactive Insight Banner */}
-      {activeItem ? (
-        <div className="p-4 rounded-2xl bg-slate-900 text-white shadow-xl border-2 border-slate-700 animate-fade-in transition-all">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-sm font-black text-white truncate">
-                  {activeItem.fullName}
-                </p>
-                {activeItem.spent > activeItem.budget ? (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 shrink-0">
-                    <AlertCircle className="w-3 h-3" />
-                    Over Budget
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0">
-                    <CheckCircle2 className="w-3 h-3" />
-                    Within Budget
-                  </span>
-                )}
-              </div>
-              <p className="text-xs font-semibold text-slate-400 mt-0.5">
-                Job-Cost Performance Breakdown
-              </p>
-            </div>
-
-            {activeItem.id && (
-              <Link
-                href={`/projects/${activeItem.id}`}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black shadow-md transition-all tap-scale shrink-0"
-              >
-                <span>Show More Details</span>
-                <ArrowUpRight className="w-4 h-4 stroke-[3]" />
-              </Link>
-            )}
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 pt-2.5 border-t border-slate-800">
-            <div>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
-                Planned Budget
-              </span>
-              <span className="text-xs sm:text-sm font-extrabold text-slate-200">
-                {formatPKR(activeItem.budget)}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
-                Actual Spent
-              </span>
-              <span
-                className={`text-xs sm:text-sm font-extrabold ${
-                  activeItem.spent > activeItem.budget ? 'text-red-400' : 'text-orange-400'
-                }`}
-              >
-                {formatPKR(activeItem.spent)}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
-                {activeItem.spent > activeItem.budget ? 'Over Budget' : 'Remaining'}
-              </span>
-              <span
-                className={`text-xs sm:text-sm font-extrabold ${
-                  activeItem.spent > activeItem.budget ? 'text-red-400' : 'text-emerald-400'
-                }`}
-              >
-                {formatPKR(Math.abs(activeItem.budget - activeItem.spent))}
-              </span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="p-3 rounded-xl bg-slate-100 border-2 border-slate-200 text-center text-xs font-bold text-slate-600 flex items-center justify-center gap-2">
-          <MousePointerClick className="w-4 h-4 text-orange-600 shrink-0" />
-          <span>
-            <strong className="text-slate-900 font-black">Interactive Chart:</strong> Hover or click any project bar to view detailed numbers and navigate directly to it.
-          </span>
-        </div>
-      )}
-
-      {/* Side-by-Side Grouped Vertical Bar Chart */}
+      {/* Side-by-Side Grouped Vertical Bar Chart (Positioned at top to ensure 100% stable geometry) */}
       <div className="w-full overflow-x-auto pb-2">
-        <div
-          className="relative min-w-[340px] w-full h-64 pt-6 pb-8 px-2 flex items-end justify-around gap-3 sm:gap-6"
-        >
+        <div className="relative min-w-[340px] w-full h-64 pt-6 pb-8 px-2 flex items-end justify-around gap-3 sm:gap-6">
           {/* Background Grid Lines with PKR Scale */}
           <div className="absolute inset-x-0 top-6 bottom-8 flex flex-col justify-between pointer-events-none opacity-40">
             {[1, 0.75, 0.5, 0.25, 0].map((frac) => (
@@ -165,13 +82,13 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
                 onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
-                className={`flex-1 max-w-[120px] flex flex-col items-center justify-end h-full relative cursor-pointer group transition-colors rounded-xl p-1 ${
+                className={`flex-1 max-w-[120px] flex flex-col items-center justify-end h-full relative cursor-pointer group rounded-xl p-1 transition-colors ${
                   isActive
-                    ? 'bg-slate-100/90 ring-2 ring-orange-500/80 shadow-xs'
+                    ? 'bg-slate-100 ring-2 ring-orange-500 shadow-sm'
                     : 'hover:bg-slate-50'
                 }`}
               >
-                {/* Full-height Hitbox covering the entire vertical column to prevent any flicker */}
+                {/* Full-height Hitbox covering the entire vertical column */}
                 <div className="absolute inset-0 z-20 cursor-pointer" />
 
                 {/* Side-by-Side Bars Container */}
@@ -182,10 +99,10 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
                       {formatShortNum(item.budget)}
                     </span>
                     <div
-                      className={`w-full rounded-t-lg transition-all duration-300 border ${
+                      className={`w-full rounded-t-lg transition-colors duration-200 border ${
                         isActive
-                          ? 'bg-slate-600 border-slate-700 shadow-md ring-2 ring-slate-400/50'
-                          : 'bg-slate-300 border-slate-400/30'
+                          ? 'bg-slate-700 border-slate-800 shadow-md ring-2 ring-slate-400/50'
+                          : 'bg-slate-300 border-slate-400/40'
                       }`}
                       style={{ height: `${budgetH}%` }}
                     />
@@ -201,7 +118,7 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
                       {item.spent > 0 ? formatShortNum(item.spent) : '0'}
                     </span>
                     <div
-                      className={`w-full rounded-t-lg transition-all duration-300 border ${
+                      className={`w-full rounded-t-lg transition-colors duration-200 border ${
                         item.spent === 0
                           ? 'bg-slate-200 border-slate-300'
                           : isOver
@@ -243,7 +160,7 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 sm:gap-6 pt-3 border-t-2 border-slate-200 text-xs font-bold text-slate-600">
+      <div className="flex items-center justify-center gap-4 sm:gap-6 pt-2 pb-1 border-t-2 border-slate-200 text-xs font-bold text-slate-600">
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 rounded bg-slate-300 border border-slate-400" />
           <span>Planned Budget</span>
@@ -256,6 +173,92 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
           <div className="w-3.5 h-3.5 rounded bg-red-500 border border-red-600" />
           <span>Over Budget</span>
         </div>
+      </div>
+
+      {/* Dynamic Interactive Insight Banner (Placed BELOW the chart so hovering NEVER causes layout shift or jitter!) */}
+      <div className="min-h-[135px]">
+        {activeItem ? (
+          <div className="p-4 rounded-2xl bg-slate-900 text-white shadow-xl border-2 border-slate-700 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-black text-white truncate">
+                    {activeItem.fullName}
+                  </p>
+                  {activeItem.spent > activeItem.budget ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 shrink-0">
+                      <AlertCircle className="w-3 h-3" />
+                      Over Budget
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Within Budget
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs font-semibold text-slate-400 mt-0.5">
+                  Job-Cost Performance Breakdown
+                </p>
+              </div>
+
+              {activeItem.id && (
+                <Link
+                  href={`/projects/${activeItem.id}`}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black shadow-md transition-all tap-scale shrink-0 cursor-pointer"
+                >
+                  <span>Show More Details</span>
+                  <ArrowUpRight className="w-4 h-4 stroke-[3]" />
+                </Link>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 pt-2.5 border-t border-slate-800">
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
+                  Planned Budget
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-slate-200">
+                  {formatPKR(activeItem.budget)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
+                  Actual Spent
+                </span>
+                <span
+                  className={`text-xs sm:text-sm font-extrabold ${
+                    activeItem.spent > activeItem.budget ? 'text-red-400' : 'text-orange-400'
+                  }`}
+                >
+                  {formatPKR(activeItem.spent)}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400 block">
+                  {activeItem.spent > activeItem.budget ? 'Over Budget' : 'Remaining'}
+                </span>
+                <span
+                  className={`text-xs sm:text-sm font-extrabold ${
+                    activeItem.spent > activeItem.budget ? 'text-red-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {formatPKR(Math.abs(activeItem.budget - activeItem.spent))}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-slate-100 border-2 border-slate-200 text-center text-xs font-bold text-slate-600 flex flex-col items-center justify-center gap-1 h-[135px]">
+            <div className="flex items-center gap-1.5 text-slate-800 font-black">
+              <MousePointerClick className="w-4 h-4 text-orange-600" />
+              <span>Interactive Chart Inspector</span>
+            </div>
+            <p className="text-slate-500 max-w-xs font-medium">
+              Hover or click on any project bar above to lock its financial breakdown and navigate directly to it.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

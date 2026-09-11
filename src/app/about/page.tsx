@@ -69,7 +69,7 @@ export default async function AboutPage() {
           {/* External Link to QI Tyrix Portfolio */}
           <div className="mt-4 pt-4 border-t border-slate-800 relative z-10">
             <a
-              href="https://qi-hotels.vercel.app/"
+              href="https://qi-tyrix.netlify.app/"
               target="_blank"
               rel="noopener noreferrer"
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 transition-all tap-scale cursor-pointer"
@@ -171,7 +171,15 @@ export default async function AboutPage() {
         <div className="pt-2 text-center text-xs text-slate-500 space-y-1">
           <p className="flex items-center justify-center gap-1 font-semibold">
             Crafted with <Heart className="w-3.5 h-3.5 text-red-500 fill-red-500 inline" /> by{' '}
-            <strong className="text-slate-900">Qazi Israr</strong>
+            <a
+              href="https://qi-tyrix.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-600 hover:text-orange-700 font-black underline cursor-pointer inline-flex items-center gap-0.5"
+            >
+              QI Tyrix
+              <ExternalLink className="w-3 h-3 inline" />
+            </a>
           </p>
           <p className="text-[11px] text-slate-400">
             &copy; {new Date().getFullYear()} QI Tyrix. All rights reserved.

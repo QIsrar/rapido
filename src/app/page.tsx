@@ -53,7 +53,7 @@ export default async function DashboardPage() {
             {greeting} 👷
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Rapido by <span className="text-orange-600 font-bold">QI Tyrix</span>
+            Rapido by <a href="https://qi-tyrix.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-orange-600 font-bold hover:underline">QI Tyrix</a>
           </p>
         </div>
 

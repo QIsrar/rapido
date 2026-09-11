@@ -346,6 +346,46 @@ export async function completeProject(
 }
 
 /**
+ * Permanently delete a project and all associated expenses.
+ * Allowed for both active and completed projects.
+ */
+export async function deleteProject(
+  id: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
+    if (!id || typeof id !== 'string') {
+      return { success: false, error: 'Valid project ID is required.' };
+    }
+
+    // 1. Delete associated expenses first
+    await supabase.from('expenses').delete().eq('project_id', id);
+
+    // 2. Delete the project record
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+
+    if (error) {
+      console.error('deleteProject error:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath('/');
+    revalidatePath('/projects');
+    revalidatePath('/reports');
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('deleteProject exception:', err);
+    return {
+      success: false,
+      error: formatErrorMessage(err, 'Failed to delete project'),
+    };
+  }
+}
+
+/**
  * Create a new expense.
  * Automatically defaults to today's date if not specified.
  * When category is 'Misc', a description/name is strictly required.
@@ -610,6 +650,22 @@ export async function softDeleteExpense(
 
     if (!expenseId) {
       return { success: false, error: 'Valid expense ID is required.' };
+    }
+
+    // Verify project is not completed (completed projects are sealed from deletions)
+    if (projectId) {
+      const { data: proj } = await supabase
+        .from('projects')
+        .select('status')
+        .eq('id', projectId)
+        .single();
+
+      if (proj && proj.status === 'completed') {
+        return {
+          success: false,
+          error: 'Cannot delete expenses from a completed project. Financial logs are sealed.',
+        };
+      }
     }
 
     const now = new Date().toISOString();
