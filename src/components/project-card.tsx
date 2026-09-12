@@ -167,27 +167,27 @@ export function ProjectCard({ project, index = 0, highlightedId = '' }: ProjectC
         </div>
 
         {/* 3 Explicit Financial Boxes (Budget, Spent, Remaining) */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-slate-100 text-center">
-          <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-slate-100 text-center">
+          <div className="px-1.5 py-2 rounded-xl bg-slate-50 border border-slate-200/80">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
               Budget
             </span>
-            <span className="text-xs font-black text-slate-900 block truncate mt-0.5">
+            <span className="text-[11px] sm:text-xs font-black text-slate-900 block mt-0.5 tracking-tight">
               {formatPKR(project.total_budget)}
             </span>
           </div>
 
-          <div className="p-2 rounded-xl bg-amber-50/70 border border-amber-200/70">
+          <div className="px-1.5 py-2 rounded-xl bg-amber-50/70 border border-amber-200/70">
             <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">
               Spent
             </span>
-            <span className="text-xs font-black text-amber-950 block truncate mt-0.5">
+            <span className="text-[11px] sm:text-xs font-black text-amber-950 block mt-0.5 tracking-tight">
               {formatPKR(project.total_spent)}
             </span>
           </div>
 
           <div
-            className={`p-2 rounded-xl border ${
+            className={`px-1.5 py-2 rounded-xl border ${
               isOverBudget
                 ? 'bg-red-50 border-red-200 text-red-900'
                 : 'bg-emerald-50/70 border-emerald-200/70 text-emerald-900'
@@ -200,7 +200,7 @@ export function ProjectCard({ project, index = 0, highlightedId = '' }: ProjectC
             >
               {isOverBudget ? 'Over Budget' : 'Remaining'}
             </span>
-            <span className="text-xs font-black block truncate mt-0.5">
+            <span className="text-[11px] sm:text-xs font-black block mt-0.5 tracking-tight">
               {formatPKR(Math.abs(remaining))}
             </span>
           </div>

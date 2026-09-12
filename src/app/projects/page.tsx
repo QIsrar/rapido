@@ -19,7 +19,7 @@ export default async function ProjectsPage({
     tab === 'completed' ? 'completed' : tab === 'active' ? 'active' : 'all';
 
   return (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-40">
       <header className="pt-4 pb-4 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">All Projects</h1>

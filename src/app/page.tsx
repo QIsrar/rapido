@@ -76,7 +76,9 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-2 shrink-0">
           <UserStatusBadge />
           {allProjects.length === 0 && <SeedButton />}
-          <AddProjectDialog buttonVariant="primary" />
+          <div className="hidden sm:block">
+            <AddProjectDialog buttonVariant="primary" />
+          </div>
         </div>
       </header>
 

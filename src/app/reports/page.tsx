@@ -30,7 +30,7 @@ export default async function ReportsPage() {
   const maxCategoryTotal = Math.max(...categoryTotals.map((c) => c.total), 1);
 
   return (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-40">
       <header className="pt-4 pb-5 animate-fade-in">
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Reports</h1>
         <p className="text-xs text-slate-500 mt-0.5">

@@ -191,10 +191,11 @@ export function DeleteProjectButton({
           }
           setIsOpen(true);
         }}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 text-xs font-bold text-slate-600 hover:text-red-600 transition-all tap-scale cursor-pointer"
+        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 text-xs font-bold text-slate-600 hover:text-red-600 transition-all tap-scale cursor-pointer shrink-0"
       >
         <Trash2 className="h-3.5 w-3.5" />
-        <span>Delete Project</span>
+        <span className="hidden sm:inline">Delete Project</span>
+        <span className="sm:hidden">Delete</span>
       </button>
 
       {isOpen && mounted && createPortal(modalContent, document.body)}

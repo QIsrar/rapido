@@ -21,7 +21,7 @@ export function BottomNav() {
     : baseNavItems;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/60 glass-nav shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-slate-200/90 bg-white shadow-[0_-6px_25px_rgba(0,0,0,0.06)]">
       {/* Safe area spacer for notched phones */}
       <div className="flex items-center justify-around px-2 pt-1.5 pb-[max(0.6rem,env(safe-area-inset-bottom))]">
         {navItems.map((item) => {

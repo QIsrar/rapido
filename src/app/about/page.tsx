@@ -23,7 +23,7 @@ export default async function AboutPage() {
   const dbStatus = await testDatabaseConnection();
 
   return (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 animate-fade-in">
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-40 animate-fade-in">
       {/* Header */}
       <header className="pt-4 pb-5 flex items-center gap-3.5">
         <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-orange-500 shadow-md shadow-orange-500/15 shrink-0 bg-white p-0.5">

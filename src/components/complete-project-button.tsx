@@ -185,10 +185,11 @@ export function CompleteProjectButton({
           }
           setIsOpen(true);
         }}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-emerald-400 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-xs font-black text-emerald-800 shadow-xs transition-all tap-scale"
+        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border-2 border-emerald-400 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-xs font-black text-emerald-800 shadow-xs transition-all tap-scale shrink-0 cursor-pointer"
       >
         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-        Mark as Completed
+        <span className="hidden sm:inline">Mark as Completed</span>
+        <span className="sm:hidden">Complete</span>
       </button>
 
       {/* Render via Portal directly onto document.body at z-[9999] */}

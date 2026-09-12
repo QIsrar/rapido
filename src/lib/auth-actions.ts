@@ -198,6 +198,40 @@ export async function signOutUser(): Promise<{ success: boolean }> {
 }
 
 /**
+ * Verify current temporary password before unlocking new password fields
+ */
+export async function verifyCurrentTempPassword(
+  tempPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user || !user.email) {
+      return { success: false, error: 'Session expired. Please sign in again.' };
+    }
+
+    if (!tempPassword.trim()) {
+      return { success: false, error: 'Please enter your temporary password.' };
+    }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: tempPassword,
+    });
+
+    if (verifyError) {
+      return { success: false, error: 'Temporary password does not match. Please verify the credentials sent to you.' };
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Verification failed';
+    return { success: false, error: message };
+  }
+}
+
+/**
  * Mandatory Password Reset (first-login requirement)
  */
 export async function completeMandatoryPasswordReset(
@@ -214,6 +248,14 @@ export async function completeMandatoryPasswordReset(
 
     if (newPassword.length < 8) {
       return { success: false, error: 'New password must be at least 8 characters.' };
+    }
+
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword)) {
+      return { success: false, error: 'New password must contain at least 1 special character (!@#$%^&*).' };
+    }
+
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+      return { success: false, error: 'New password must contain uppercase, lowercase, and numbers.' };
     }
 
     // Verify current temp password with sign in check

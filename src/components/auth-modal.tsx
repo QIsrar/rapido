@@ -101,27 +101,27 @@ export function AuthModal() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-md bg-card border border-border/80 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md max-h-[92vh] flex flex-col bg-card border border-border/80 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-border/60">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-500 font-bold">
+        <div className="flex items-center justify-between px-4 sm:px-6 pt-4 sm:pt-5 pb-3 border-b border-border/60 gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold shrink-0">
               R
             </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm sm:text-base font-black text-foreground truncate">
                 {requestSuccess
                   ? 'Application Received'
                   : authModalTab === 'signin'
                   ? 'Sign In to Rapido'
                   : 'Request Contractor Access'}
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
                 {requestSuccess
                   ? 'Pending Admin Verification'
                   : authModalTab === 'signin'
@@ -132,7 +132,7 @@ export function AuthModal() {
           </div>
           <button
             onClick={resetAndClose}
-            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+            className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -141,14 +141,14 @@ export function AuthModal() {
 
         {/* Tab switchers (only if not on celebration screen) */}
         {!requestSuccess && (
-          <div className="flex p-1 mx-6 mt-4 bg-muted/60 rounded-xl">
+          <div className="flex p-1 mx-4 sm:mx-6 mt-3 bg-muted/60 rounded-xl shrink-0">
             <button
               type="button"
               onClick={() => {
                 setSignInError(null);
                 openAuthModal('signin');
               }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 authModalTab === 'signin'
                   ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -163,7 +163,7 @@ export function AuthModal() {
                 setRequestError(null);
                 openAuthModal('signup');
               }}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
                 authModalTab === 'signup'
                   ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
@@ -176,7 +176,7 @@ export function AuthModal() {
         )}
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
           {/* CELEBRATION / SUCCESS SCREEN */}
           {requestSuccess ? (
             <div className="text-center py-4 space-y-4 animate-in zoom-in-95 duration-300">

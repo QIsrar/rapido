@@ -373,9 +373,9 @@ export function AddExpenseDialog({
           setErrorMsg('');
           setQuickProjectSuccess('');
         }}
-        className="fixed bottom-20 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-2xl bg-orange-600 px-5 text-base font-black text-white shadow-xl shadow-orange-600/30 hover:bg-orange-700 active:scale-95 transition-all duration-200 tap-scale"
+        className="fixed bottom-[max(5.4rem,calc(env(safe-area-inset-bottom)+4.6rem))] right-4 z-40 inline-flex h-12 sm:h-14 items-center gap-2 rounded-2xl bg-orange-600 px-4 sm:px-5 text-sm sm:text-base font-black text-white shadow-2xl shadow-orange-600/40 hover:bg-orange-700 active:scale-95 transition-all duration-200 tap-scale border-2 border-orange-500/40"
       >
-        <Plus className="h-6 w-6 stroke-[3]" />
+        <Plus className="h-5 w-5 sm:h-6 sm:w-6 stroke-[3]" />
         Log Expense
       </button>
 

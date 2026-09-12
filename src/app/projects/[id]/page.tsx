@@ -83,7 +83,7 @@ export default async function ProjectDetailsPage({
     : null;
 
   return (
-    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
+    <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-40">
       {/* Top navigation */}
       <div className="pt-2 pb-3 flex items-center justify-between animate-fade-in">
         <Link
@@ -166,29 +166,29 @@ export default async function ProjectDetailsPage({
       </header>
 
       {/* Budget Overview Card */}
-      <Card className="p-5 bg-white border border-slate-200 shadow-elevated mb-5 animate-slide-up" style={{ animationDelay: '60ms' }}>
+      <Card className="p-4 sm:p-5 bg-white border border-slate-200 shadow-elevated mb-5 animate-slide-up" style={{ animationDelay: '60ms' }}>
         {/* 3 Explicit Financial Metric Boxes */}
-        <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-4 text-center">
+          <div className="px-1.5 py-2.5 sm:p-3 rounded-2xl bg-slate-50 border border-slate-200">
             <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
               Total Budget
             </span>
-            <span className="text-sm font-black text-slate-900 block truncate mt-1">
+            <span className="text-[11px] sm:text-sm font-black text-slate-900 block mt-1 tracking-tight">
               {formatPKR(project.total_budget)}
             </span>
           </div>
 
-          <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+          <div className="px-1.5 py-2.5 sm:p-3 rounded-2xl bg-amber-50/70 border border-amber-200/80">
             <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">
               Total Spent
             </span>
-            <span className="text-sm font-black text-amber-950 block truncate mt-1">
+            <span className="text-[11px] sm:text-sm font-black text-amber-950 block mt-1 tracking-tight">
               {formatPKR(project.total_spent)}
             </span>
           </div>
 
           <div
-            className={`p-3 rounded-2xl border ${
+            className={`px-1.5 py-2.5 sm:p-3 rounded-2xl border ${
               isOverBudget
                 ? 'bg-red-50 border-red-200 text-red-900'
                 : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
@@ -199,9 +199,9 @@ export default async function ProjectDetailsPage({
                 isOverBudget ? 'text-red-700' : 'text-emerald-700'
               }`}
             >
-              {isOverBudget ? 'Over Budget' : 'Remaining'}
+              {isOverBudget ? 'Over Limit' : 'Remaining'}
             </span>
-            <span className="text-sm font-black block truncate mt-1">
+            <span className="text-[11px] sm:text-sm font-black block mt-1 tracking-tight">
               {formatPKR(Math.abs(remaining))}
             </span>
           </div>
