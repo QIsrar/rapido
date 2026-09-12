@@ -244,7 +244,7 @@ export function AddExpenseDialog({
         clearReceipt();
         if (!defaultProjectId) setProjectId('');
         setOpen(false);
-      }, 1400);
+      }, 3000);
       return;
     }
 
@@ -341,7 +341,7 @@ export function AddExpenseDialog({
         router.refresh();
       });
 
-      // Smooth countdown dismiss
+      // Smooth countdown dismiss (3 seconds so user can clearly see the logged details)
       setTimeout(() => {
         setIsExpenseSuccess(false);
         setSuccessDetails(null);
@@ -350,7 +350,7 @@ export function AddExpenseDialog({
         clearReceipt();
         if (!defaultProjectId) setProjectId('');
         setOpen(false);
-      }, 1400);
+      }, 3000);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error recording expense.');
     } finally {
@@ -386,7 +386,7 @@ export function AddExpenseDialog({
           className="h-[90dvh] rounded-t-3xl border-t-2 border-slate-300 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           {isExpenseSuccess && successDetails ? (
-            <div className="py-14 px-3 text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="py-10 px-3 text-center space-y-4 animate-in zoom-in-95 duration-200">
               <div className="w-16 h-16 rounded-full bg-emerald-100 border-4 border-emerald-400 text-emerald-600 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20 animate-bounce">
                 <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
               </div>
@@ -401,16 +401,35 @@ export function AddExpenseDialog({
                 <p className="text-xs font-bold text-slate-600">
                   {successDetails.category} · <span className="text-orange-600 font-black">{successDetails.projectName}</span>
                 </p>
-                <p className="text-[11px] font-semibold text-slate-400 pt-2">
+                <p className="text-[11px] font-semibold text-slate-400 pt-1">
                   Navigating to project expenses...
                 </p>
               </div>
-              {/* Animated countdown bar */}
-              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-6 max-w-xs mx-auto">
+              {/* Animated countdown bar (3 seconds) */}
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-3 max-w-xs mx-auto">
                 <div
                   className="bg-emerald-500 h-full w-full origin-left"
-                  style={{ animation: 'shrink 1.4s linear forwards' }}
+                  style={{ animation: 'shrink 3s linear forwards' }}
                 />
+              </div>
+
+              {/* Explicit button to dismiss instantly */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExpenseSuccess(false);
+                    setSuccessDetails(null);
+                    setAmount('');
+                    setDescription('');
+                    clearReceipt();
+                    if (!defaultProjectId) setProjectId('');
+                    setOpen(false);
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black shadow-md transition-all tap-scale"
+                >
+                  View Project Expenses &rarr;
+                </button>
               </div>
             </div>
           ) : (

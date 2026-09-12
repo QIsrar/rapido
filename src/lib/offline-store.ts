@@ -58,6 +58,18 @@ export function getDraftProjects(): DraftProject[] {
 }
 
 /**
+ * Update an existing project draft.
+ */
+export function updateDraftProject(tempId: string, updates: Partial<DraftProject>): void {
+  const drafts = getDraftProjects().map((d) =>
+    d.tempId === tempId ? { ...d, ...updates } : d
+  );
+  try {
+    localStorage.setItem(PROJECT_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {}
+}
+
+/**
  * Remove a synced project draft.
  */
 export function removeDraftProject(tempId: string): void {
@@ -97,6 +109,18 @@ export function getDraftExpenses(): DraftExpense[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Update an existing expense draft.
+ */
+export function updateDraftExpense(tempId: string, updates: Partial<DraftExpense>): void {
+  const drafts = getDraftExpenses().map((d) =>
+    d.tempId === tempId ? { ...d, ...updates } : d
+  );
+  try {
+    localStorage.setItem(EXPENSE_DRAFTS_KEY, JSON.stringify(drafts));
+  } catch {}
 }
 
 /**

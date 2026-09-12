@@ -1,5 +1,5 @@
 // Rapido PWA Service Worker — Offline & High-Performance Caching
-const CACHE_NAME = 'rapido-cache-v1';
+const CACHE_NAME = 'rapido-cache-v2';
 const STATIC_ASSETS = [
   '/',
   '/projects',
@@ -58,9 +58,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname === '/og-image.jpg'
   ) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
+      caches.match(request, { ignoreSearch: true }).then((cachedResponse) => {
         if (cachedResponse) {
-          // Fetch updated version in background
           fetch(request)
             .then((networkResponse) => {
               if (networkResponse && networkResponse.status === 200) {
@@ -84,30 +83,43 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation / Page HTML requests -> Network-First, fallback to Cache
-  if (request.mode === 'navigate') {
+  // 2. Project Detail and App Navigation / Page requests -> Network-First with Cache Fallback
+  if (request.mode === 'navigate' || url.searchParams.has('_rsc') || url.pathname.startsWith('/projects/')) {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
+              // Store with URL without search params as well for robust matching
               cache.put(request, clone);
+              cache.put(url.pathname, networkResponse.clone());
             });
           }
           return networkResponse;
         })
         .catch(async () => {
-          // Network failed (offline) -> serve cached page
-          const cachedResponse = await caches.match(request);
+          // 1. Try exact or search-ignored match
+          const cachedResponse = await caches.match(request, { ignoreSearch: true });
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Fallback to cached home page
-          const homeFallback = await caches.match('/');
-          if (homeFallback) {
-            return homeFallback;
+
+          // 2. Try matching by pathname
+          const pathResponse = await caches.match(url.pathname);
+          if (pathResponse) {
+            return pathResponse;
           }
+
+          // 3. Fallback to /projects or /
+          if (url.pathname.startsWith('/projects')) {
+            const projectsFallback = await caches.match('/projects');
+            if (projectsFallback) return projectsFallback;
+          }
+
+          const homeFallback = await caches.match('/');
+          if (homeFallback) return homeFallback;
+
           return new Response(
             `<!DOCTYPE html>
             <html lang="en">
@@ -126,7 +138,7 @@ self.addEventListener('fetch', (event) => {
               <body>
                 <div class="card">
                   <h1>⚠️ Offline Mode</h1>
-                  <p>You are currently offline. Rapido will automatically restore your live job data when your internet reconnects.</p>
+                  <p>You are currently offline. Rapido will restore live job data once you reconnect.</p>
                   <button onclick="window.location.reload()">Retry Connection</button>
                 </div>
               </body>
@@ -148,6 +160,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => caches.match(request))
+      .catch(() => caches.match(request, { ignoreSearch: true }))
   );
 });

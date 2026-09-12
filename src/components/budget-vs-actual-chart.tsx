@@ -45,133 +45,151 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
   );
 
   const formatShortNum = (val: number) => {
-    if (val >= 10000000) return `${(val / 10000000).toFixed(1)}Cr`;
-    if (val >= 100000) return `${(val / 100000).toFixed(1)}L`;
-    if (val >= 1000) return `${Math.round(val / 1000)}k`;
-    return `${val}`;
+    const rounded = Math.round(val);
+    if (rounded >= 10000000) return `${(rounded / 10000000).toFixed(1)}Cr`;
+    if (rounded >= 100000) return `${(rounded / 100000).toFixed(1)}L`;
+    if (rounded >= 1000) return `${Math.round(rounded / 1000)}k`;
+    return `${rounded}`;
   };
 
   return (
     <div className="space-y-4 select-none">
       {/* Side-by-Side Grouped Vertical Bar Chart */}
-      <div className="w-full overflow-x-auto pb-1">
-        <div className="relative min-w-[340px] w-full h-64 pt-6 pb-8 px-2 flex items-end justify-around gap-3 sm:gap-6">
-          {/* Background Grid Lines with High-Contrast Deep Black PKR Scale */}
-          <div className="absolute inset-x-0 top-6 bottom-8 flex flex-col justify-between pointer-events-none">
-            {[1, 0.75, 0.5, 0.25, 0].map((frac) => (
-              <div key={frac} className="w-full border-b border-dashed border-slate-300 relative">
-                <span className="absolute -top-3.5 left-0 text-[10px] font-black text-black bg-white/95 px-1 py-0.2 rounded border border-slate-200 shadow-2xs">
-                  {formatShortNum(Math.round(maxVal * frac))}
-                </span>
-              </div>
-            ))}
-          </div>
+      <div className="w-full flex items-stretch border-b border-slate-200 pb-1">
+        {/* 
+          Dedicated Left Y-Axis Scale Column:
+          Isolated in its own fixed-width column so Y-axis labels NEVER overlap or collide with project bars!
+        */}
+        <div className="w-12 shrink-0 flex flex-col justify-between text-right pr-2 pt-6 pb-14 text-[10px] font-black text-slate-700 border-r border-slate-200 select-none">
+          {[1, 0.75, 0.5, 0.25, 0].map((frac) => (
+            <span key={frac} className="leading-none">
+              {formatShortNum(Math.round(maxVal * frac))}
+            </span>
+          ))}
+        </div>
 
-          {/* Project Bar Columns */}
-          {data.map((item, index) => {
-            const budgetH = Math.max((item.budget / maxVal) * 100, 8);
-            const spentH = Math.max((item.spent / maxVal) * 100, item.spent > 0 ? 8 : 4);
-            const isOver = item.spent > item.budget;
-            const isHovered = hoveredIndex === index;
-            const isSelected = selectedIndex === index;
-            const isActive = isHovered || isSelected;
+        {/* Scrollable Project Columns & Grid Area */}
+        <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none relative">
+          <div className="relative min-w-max h-64 pt-6 pb-2 px-3 flex items-end gap-3 sm:gap-5">
+            {/* Background Grid Lines across the plot area */}
+            <div className="absolute inset-x-0 top-6 bottom-14 flex flex-col justify-between pointer-events-none">
+              {[1, 0.75, 0.5, 0.25, 0].map((frac) => (
+                <div key={frac} className="w-full border-b border-dashed border-slate-200" />
+              ))}
+            </div>
 
-            return (
-              <div
-                key={item.fullName + index}
-                className={`flex-1 max-w-[120px] flex flex-col items-center justify-end h-full relative rounded-xl p-1 transition-colors duration-150 ${
-                  isActive ? 'bg-orange-50/90' : 'hover:bg-slate-50'
-                }`}
-              >
-                {/* 
-                  Isolated Full-Height Overlay Hitbox:
-                  Captures 100% of pointer events so the mouse NEVER interacts with changing bars, 
-                  labels, borders or child nodes. Completely eliminates hover flicker loops.
-                */}
+            {/* Project Bar Columns */}
+            {data.map((item, index) => {
+              const budgetH = Math.max((item.budget / maxVal) * 100, 8);
+              const spentH = Math.max((item.spent / maxVal) * 100, item.spent > 0 ? 8 : 4);
+              const isOver = item.spent > item.budget;
+              const isHovered = hoveredIndex === index;
+              const isSelected = selectedIndex === index;
+              const isActive = isHovered || isSelected;
+
+              return (
                 <div
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
-                  onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
-                  className="absolute inset-0 z-30 cursor-pointer"
-                  title={`Click to inspect ${item.fullName}`}
-                />
+                  key={item.fullName + index}
+                  className={`w-24 sm:w-28 shrink-0 flex flex-col items-center justify-end h-full relative rounded-xl p-1.5 transition-colors duration-150 ${
+                    isActive ? 'bg-orange-50/90 ring-1 ring-orange-500/20' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  {/* 
+                    Hitbox overlay:
+                    Captures 100% of pointer events so the mouse NEVER interacts with changing bars.
+                  */}
+                  <div
+                    onMouseEnter={() => setHoveredIndex(index)}
+                    onMouseLeave={() => setHoveredIndex(null)}
+                    onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
+                    className="absolute inset-0 z-30 cursor-pointer"
+                    title={`Click to inspect ${item.fullName}`}
+                  />
 
-                {/* Bars Container — pointer-events-none ensures zero interference */}
-                <div className="w-full flex items-end justify-center gap-1.5 sm:gap-2.5 h-48 z-10 pointer-events-none">
-                  {/* Budget Bar */}
-                  <div className="flex flex-col items-center justify-end h-full w-6 sm:w-8">
-                    <span className="text-[9px] font-black text-slate-800 mb-1 leading-none">
-                      {formatShortNum(item.budget)}
-                    </span>
-                    <div
-                      className={`w-full rounded-t-lg transition-colors duration-150 border ${
-                        isActive
-                          ? 'bg-slate-700 border-slate-900 shadow-md'
-                          : 'bg-slate-300 border-slate-400'
-                      }`}
-                      style={{ height: `${budgetH}%` }}
-                    />
+                  {/* Bars Container */}
+                  <div className="w-full flex items-end justify-center gap-1.5 sm:gap-2.5 h-40 z-10 pointer-events-none">
+                    {/* Budget Bar */}
+                    <div className="flex flex-col items-center justify-end h-full w-7 sm:w-8">
+                      <span className="text-[10px] font-black text-slate-800 mb-1 leading-none">
+                        {formatShortNum(item.budget)}
+                      </span>
+                      <div
+                        className={`w-full rounded-t-lg transition-colors duration-150 border ${
+                          isActive
+                            ? 'bg-slate-700 border-slate-900 shadow-md'
+                            : 'bg-slate-300 border-slate-400'
+                        }`}
+                        style={{ height: `${budgetH}%` }}
+                      />
+                    </div>
+
+                    {/* Actual Spend Bar */}
+                    <div className="flex flex-col items-center justify-end h-full w-7 sm:w-8">
+                      <span
+                        className={`text-[10px] font-black mb-1 leading-none ${
+                          isOver ? 'text-red-700 font-extrabold' : 'text-orange-700 font-extrabold'
+                        }`}
+                      >
+                        {item.spent > 0 ? formatShortNum(item.spent) : '0'}
+                      </span>
+                      <div
+                        className={`w-full rounded-t-lg transition-colors duration-150 border ${
+                          item.spent === 0
+                            ? 'bg-slate-200 border-slate-300'
+                            : isOver
+                            ? isActive
+                              ? 'bg-gradient-to-t from-red-600 to-rose-500 shadow-md border-red-600'
+                              : 'bg-gradient-to-t from-red-500 to-rose-400 border-red-500'
+                            : isActive
+                            ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-md border-orange-600'
+                            : 'bg-gradient-to-t from-orange-500 to-amber-400 border-orange-500'
+                        }`}
+                        style={{ height: `${spentH}%` }}
+                      />
+                    </div>
                   </div>
 
-                  {/* Actual Spend Bar */}
-                  <div className="flex flex-col items-center justify-end h-full w-6 sm:w-8">
-                    <span
-                      className={`text-[9px] font-black mb-1 leading-none ${
-                        isOver ? 'text-red-700 font-extrabold' : 'text-orange-700 font-extrabold'
+                  {/* Project Name & Percentage Label */}
+                  <div className="mt-2 text-center w-full px-0.5 z-10 pointer-events-none">
+                    <p
+                      className={`text-xs font-black truncate transition-colors ${
+                        isActive ? 'text-orange-600' : 'text-slate-900'
                       }`}
                     >
-                      {item.spent > 0 ? formatShortNum(item.spent) : '0'}
-                    </span>
-                    <div
-                      className={`w-full rounded-t-lg transition-colors duration-150 border ${
-                        item.spent === 0
-                          ? 'bg-slate-200 border-slate-300'
-                          : isOver
-                          ? isActive
-                            ? 'bg-gradient-to-t from-red-600 to-rose-500 shadow-md border-red-600'
-                            : 'bg-gradient-to-t from-red-500 to-rose-400 border-red-500'
-                          : isActive
-                          ? 'bg-gradient-to-t from-orange-600 to-amber-500 shadow-md border-orange-600'
-                          : 'bg-gradient-to-t from-orange-500 to-amber-400 border-orange-500'
+                      {item.name}
+                    </p>
+                    <span
+                      className={`inline-block text-[10px] font-black px-1.5 py-0.5 rounded mt-0.5 ${
+                        isOver
+                          ? 'bg-red-100 text-red-700 font-extrabold'
+                          : 'bg-slate-200 text-slate-800 font-bold'
                       }`}
-                      style={{ height: `${spentH}%` }}
-                    />
+                    >
+                      {item.budget > 0
+                        ? item.spent <= 0
+                          ? '0%'
+                          : (item.spent / item.budget) * 100 < 1
+                          ? `${((item.spent / item.budget) * 100).toFixed(1)}%`
+                          : `${Math.round((item.spent / item.budget) * 100)}%`
+                        : '0%'}
+                    </span>
                   </div>
                 </div>
-
-                {/* Project Name Label — pointer-events-none */}
-                <div className="mt-2 text-center w-full px-1 z-10 pointer-events-none">
-                  <p
-                    className={`text-[11px] font-black truncate transition-colors ${
-                      isActive ? 'text-orange-600' : 'text-slate-900'
-                    }`}
-                  >
-                    {item.name}
-                  </p>
-                  <span
-                    className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded mt-0.5 ${
-                      isOver
-                        ? 'bg-red-100 text-red-700 font-extrabold'
-                        : 'bg-slate-200 text-slate-800 font-bold'
-                    }`}
-                  >
-                    {item.budget > 0
-                      ? item.spent <= 0
-                        ? '0%'
-                        : (item.spent / item.budget) * 100 < 1
-                        ? `${((item.spent / item.budget) * 100).toFixed(1)}%`
-                        : `${Math.round((item.spent / item.budget) * 100)}%`
-                      : '0%'}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
+      {/* Horizontal scroll helper if more than 3 projects */}
+      {data.length > 3 && (
+        <p className="text-[10px] font-semibold text-slate-400 text-right -mt-2 pr-1 sm:hidden">
+          Swipe left/right to view all projects &rarr;
+        </p>
+      )}
+
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 sm:gap-6 pt-2 pb-1 border-t border-slate-200 text-xs font-bold text-slate-700">
+      <div className="flex items-center justify-center gap-4 sm:gap-6 pt-1 pb-1 text-xs font-bold text-slate-700">
         <div className="flex items-center gap-1.5">
           <div className="w-3.5 h-3.5 rounded bg-slate-300 border border-slate-400" />
           <span>Planned Budget</span>
@@ -186,11 +204,7 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
         </div>
       </div>
 
-      {/* 
-        Fixed-Height Stable Insight Card:
-        Exact same 144px height for both active and default states.
-        Guarantees zero layout shift, zero vertical push, and zero scroll bounce.
-      */}
+      {/* Fixed-Height Stable Insight Card */}
       <div className="h-36 w-full">
         {activeItem ? (
           <div className="h-full p-4 rounded-2xl bg-slate-900 text-white shadow-xl border-2 border-slate-700 flex flex-col justify-between animate-in fade-in duration-150">
