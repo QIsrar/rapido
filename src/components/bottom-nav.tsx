@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FolderKanban, BarChart3, Info } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, BarChart3, Info, ShieldCheck } from 'lucide-react';
+import { useAuth } from './auth-context';
 
-const navItems = [
+const baseNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/projects', label: 'Projects', icon: FolderKanban },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
@@ -13,6 +14,11 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { isAdmin } = useAuth();
+
+  const navItems = isAdmin
+    ? [...baseNavItems, { href: '/admin', label: 'Admin', icon: ShieldCheck }]
+    : baseNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/60 glass-nav shadow-[0_-4px_24px_rgba(0,0,0,0.04)]">

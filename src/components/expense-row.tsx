@@ -21,6 +21,7 @@ import type { Expense } from '@/types/database';
 import { formatPKR } from '@/lib/utils';
 import { softDeleteExpense } from '@/lib/actions';
 import { ReceiptViewer } from '@/components/receipt-viewer';
+import { useAuth } from './auth-context';
 
 const categoryConfig: Record<
   string,
@@ -77,6 +78,7 @@ export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
   const router = useRouter();
   const config = categoryConfig[expense.category] || categoryConfig.Misc;
   const Icon = config.icon;
+  const { isGuest, openAuthModal } = useAuth();
 
   const [mounted, setMounted] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -259,7 +261,13 @@ export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
         {showDelete && (
           <button
             type="button"
-            onClick={() => setShowDeleteModal(true)}
+            onClick={() => {
+              if (isGuest) {
+                openAuthModal('signin');
+                return;
+              }
+              setShowDeleteModal(true);
+            }}
             aria-label="Delete expense"
             title="Delete expense"
             className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all tap-scale cursor-pointer"

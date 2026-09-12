@@ -45,7 +45,7 @@ import {
 import { uploadReceipt } from '@/lib/storage';
 import { saveDraftExpense } from '@/lib/offline-store';
 import { formatPKR } from '@/lib/utils';
-
+import { useAuth } from './auth-context';
 
 interface AddExpenseDialogProps {
   projects?: Project[];
@@ -57,6 +57,7 @@ export function AddExpenseDialog({
   defaultProjectId = '',
 }: AddExpenseDialogProps) {
   const router = useRouter();
+  const { isGuest, openAuthModal } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -364,6 +365,10 @@ export function AddExpenseDialog({
       <button
         type="button"
         onClick={() => {
+          if (isGuest) {
+            openAuthModal('signin');
+            return;
+          }
           setOpen(true);
           setErrorMsg('');
           setQuickProjectSuccess('');

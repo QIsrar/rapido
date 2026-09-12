@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, AlertCircle, X, ShieldCheck, Sparkles } from 'lucide-react';
 import { completeProject } from '@/lib/actions';
+import { useAuth } from './auth-context';
 
 interface CompleteProjectButtonProps {
   projectId: string;
@@ -16,6 +17,7 @@ export function CompleteProjectButton({
   projectName,
 }: CompleteProjectButtonProps) {
   const router = useRouter();
+  const { isGuest, openAuthModal } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -176,7 +178,13 @@ export function CompleteProjectButton({
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          if (isGuest) {
+            openAuthModal('signin');
+            return;
+          }
+          setIsOpen(true);
+        }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-emerald-400 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-xs font-black text-emerald-800 shadow-xs transition-all tap-scale"
       >
         <CheckCircle2 className="h-4 w-4 text-emerald-600" />

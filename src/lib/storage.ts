@@ -1,4 +1,5 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { isSupabaseConfigured } from './supabase';
+import { createClient } from './supabase/client';
 
 const BUCKET = 'receipts';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -36,6 +37,7 @@ export async function uploadReceipt(
     const sanitizedExpenseId = expenseId.replace(/[^a-zA-Z0-9_-]/g, '');
     const path = `${sanitizedExpenseId}-${timestamp}.${ext}`;
 
+    const supabase = createClient();
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)
       .upload(path, file, {

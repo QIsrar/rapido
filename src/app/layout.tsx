@@ -3,6 +3,9 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { BottomNav } from '@/components/bottom-nav';
 import { OfflineManager } from '@/components/offline-manager';
+import { AuthProvider } from '@/components/auth-context';
+import { AuthModal } from '@/components/auth-modal';
+import { MandatoryPasswordReset } from '@/components/mandatory-password-reset';
 
 const inter = Inter({
   variable: '--font-sans',
@@ -58,14 +61,22 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <OfflineManager />
-        {/* Main scrollable area with bottom padding for nav */}
-        <main className="flex-1 pb-20">{children}</main>
-        <BottomNav />
+        <AuthProvider>
+          <OfflineManager />
+          {/* Main scrollable area with bottom padding for nav */}
+          <main className="flex-1 pb-20">{children}</main>
+          <BottomNav />
+          <AuthModal />
+          <MandatoryPasswordReset />
+        </AuthProvider>
       </body>
     </html>
   );

@@ -6,6 +6,7 @@ import { AddExpenseDialog } from '@/components/add-expense-dialog';
 import { AddProjectDialog } from '@/components/add-project-dialog';
 import { DashboardBanner } from '@/components/dashboard-banner';
 import { SeedButton } from '@/components/seed-button';
+import { UserStatusBadge } from '@/components/user-status-badge';
 import { getProjects } from '@/lib/actions';
 import { formatPKR } from '@/lib/utils';
 
@@ -71,8 +72,9 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Add Project Button */}
+        {/* Quick Add Project Button & Auth Status */}
         <div className="flex items-center gap-2 shrink-0">
+          <UserStatusBadge />
           {allProjects.length === 0 && <SeedButton />}
           <AddProjectDialog buttonVariant="primary" />
         </div>

@@ -15,6 +15,7 @@ import { Plus, Loader2, Home, Hammer, Wrench, X, AlertCircle, MapPin, Sparkles }
 import { PROJECT_TYPES, MIN_BUDGET_BY_TYPE, type ProjectType } from '@/types/database';
 import { createProject } from '@/lib/actions';
 import { saveDraftProject } from '@/lib/offline-store';
+import { useAuth } from './auth-context';
 
 interface AddProjectDialogProps {
   buttonVariant?: 'primary' | 'outline' | 'compact';
@@ -32,8 +33,17 @@ export function AddProjectDialog({
   className = '',
 }: AddProjectDialogProps) {
   const router = useRouter();
+  const { isGuest, openAuthModal } = useAuth();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  const handleTriggerClick = () => {
+    if (isGuest) {
+      openAuthModal('signin');
+      return;
+    }
+    setOpen(true);
+  };
 
   const [name, setName] = useState('');
   const [type, setType] = useState<ProjectType>('New Build');
@@ -188,7 +198,7 @@ export function AddProjectDialog({
       {buttonVariant === 'primary' ? (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={handleTriggerClick}
           className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black shadow-md shadow-orange-600/30 transition-all tap-scale ${className}`}
         >
           <Plus className="h-4 w-4 stroke-[3]" />
@@ -197,7 +207,7 @@ export function AddProjectDialog({
       ) : buttonVariant === 'compact' ? (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={handleTriggerClick}
           aria-label="Add New Project"
           className={`inline-flex items-center justify-center h-9 w-9 rounded-xl bg-orange-600 hover:bg-orange-700 active:scale-95 text-white shadow-md transition-all tap-scale ${className}`}
         >
@@ -206,7 +216,7 @@ export function AddProjectDialog({
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={handleTriggerClick}
           className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-slate-300 bg-white hover:bg-slate-50 active:scale-95 text-xs font-black text-slate-800 shadow-xs transition-all tap-scale ${className}`}
         >
           <Plus className="h-3.5 w-3.5 text-orange-600 stroke-[3]" />

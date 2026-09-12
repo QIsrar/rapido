@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Trash2, Loader2, AlertTriangle, X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { deleteProject } from '@/lib/actions';
+import { useAuth } from './auth-context';
 
 interface DeleteProjectButtonProps {
   projectId: string;
@@ -18,6 +19,7 @@ export function DeleteProjectButton({
   expensesCount = 0,
 }: DeleteProjectButtonProps) {
   const router = useRouter();
+  const { isGuest, isAdmin, openAuthModal } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -178,7 +180,17 @@ export function DeleteProjectButton({
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          if (isGuest) {
+            openAuthModal('signin');
+            return;
+          }
+          if (!isAdmin) {
+            alert('Admin privileges required: Only administrator (Qazi Israr) can delete projects.');
+            return;
+          }
+          setIsOpen(true);
+        }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-slate-200 hover:border-red-300 hover:bg-red-50 text-xs font-bold text-slate-600 hover:text-red-600 transition-all tap-scale cursor-pointer"
       >
         <Trash2 className="h-3.5 w-3.5" />

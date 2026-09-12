@@ -1,13 +1,13 @@
 -- ============================================================
--- Rapido by QI Tyrix — Database Schema (Idempotent & Safe)
--- Run this in the Supabase SQL Editor
+-- Rapido by QI Tyrix — Complete Database Schema & RLS Architecture
+-- Run this in the Supabase SQL Editor (Safe & Idempotent)
 -- ============================================================
 
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================
--- ENUM TYPES (Safe to re-run; will not throw ERROR 42710)
+-- 1. ENUM TYPES (Safe to re-run; ignores duplicate_object)
 -- ============================================================
 
 DO $$ BEGIN
@@ -35,7 +35,7 @@ EXCEPTION WHEN duplicate_object THEN null;
 END $$;
 
 -- ============================================================
--- PROJECTS TABLE
+-- 2. PROJECTS TABLE
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS projects (
@@ -44,18 +44,16 @@ CREATE TABLE IF NOT EXISTS projects (
   type project_type NOT NULL,
   total_budget NUMERIC(12, 2) NOT NULL DEFAULT 0,
   status project_status NOT NULL DEFAULT 'active',
-  location TEXT,                     -- Site location or Google Maps link
+  location TEXT,
   start_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Ensure location column exists if table was created in an earlier migration
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS location TEXT;
 
-
 -- ============================================================
--- EXPENSES TABLE
+-- 3. EXPENSES TABLE
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS expenses (
@@ -67,36 +65,348 @@ CREATE TABLE IF NOT EXISTS expenses (
   receipt_url TEXT,
   description TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  deleted_at TIMESTAMPTZ             -- Soft-delete timestamp
+  deleted_at TIMESTAMPTZ
 );
 
--- Ensure deleted_at column exists if table was created in an earlier migration
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
--- ============================================================
--- INDEXES (Safe to re-run)
--- ============================================================
-
+-- Indexes on core tables
 CREATE INDEX IF NOT EXISTS idx_expenses_project_id ON expenses(project_id);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_deleted_at ON expenses(deleted_at);
 
 -- ============================================================
--- ROW LEVEL SECURITY — Permissive for single-user MVP
+-- 4. ACCESS REQUESTS TABLE (Public Sign-up / Contractor Onboarding)
 -- ============================================================
 
+CREATE TABLE IF NOT EXISTS access_requests (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  full_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  company_name TEXT NOT NULL,
+  location TEXT NOT NULL,
+  email TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_access_requests_status ON access_requests(status);
+CREATE INDEX IF NOT EXISTS idx_access_requests_email ON access_requests(email);
+
+-- ============================================================
+-- 5. PROFILES TABLE (Linked to auth.users)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL DEFAULT 'contractor' CHECK (role IN ('admin', 'contractor')),
+  company_name TEXT,                  -- NULLABLE: allows manual dashboard user creation
+  phone TEXT,                         -- NULLABLE: allows manual dashboard user creation
+  must_reset_password BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+
+-- ============================================================
+-- 6. AUTH.USERS TRIGGER -> Populates profiles table automatically
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  user_role TEXT;
+  user_must_reset BOOLEAN;
+BEGIN
+  -- Extract role from metadata if provided, otherwise default to 'contractor'
+  user_role := COALESCE(NEW.raw_user_meta_data->>'role', 'contractor');
+  IF user_role NOT IN ('admin', 'contractor') THEN
+    user_role := 'contractor';
+  END IF;
+
+  -- Admin bootstrap can pass must_reset_password = false
+  IF NEW.raw_user_meta_data->>'must_reset_password' = 'false' THEN
+    user_must_reset := false;
+  ELSE
+    user_must_reset := true;
+  END IF;
+
+  INSERT INTO public.profiles (
+    id,
+    role,
+    company_name,
+    phone,
+    must_reset_password,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    NEW.id,
+    user_role,
+    NEW.raw_user_meta_data->>'company_name',
+    NEW.raw_user_meta_data->>'phone',
+    user_must_reset,
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    role = EXCLUDED.role,
+    company_name = COALESCE(EXCLUDED.company_name, profiles.company_name),
+    phone = COALESCE(EXCLUDED.phone, profiles.phone),
+    updated_at = NOW();
+
+  RETURN NEW;
+END;
+$$;
+
+-- Drop and recreate trigger safely
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- 7. SECURITY DEFINER HELPER FUNCTIONS (Prevents recursive RLS)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = auth.uid()
+      AND role = 'admin'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_active_contractor()
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles
+    WHERE id = auth.uid()
+      AND role IN ('admin', 'contractor')
+      AND must_reset_password = false
+  );
+$$;
+
+-- Grant execution to authenticated & anon roles
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_contractor() TO authenticated, anon;
+
+-- ============================================================
+-- 8. ROW LEVEL SECURITY (RLS) POLICIES
+-- ============================================================
+
+-- Enable RLS on all tables
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE access_requests ENABLE ROW LEVEL SECURITY;
 
+-- ------------------------------------------------------------
+-- PROFILES POLICIES
+-- ------------------------------------------------------------
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow user to select own profile" ON profiles;
+  CREATE POLICY "Allow user to select own profile"
+    ON profiles FOR SELECT
+    TO authenticated
+    USING (id = auth.uid() OR is_admin());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow user to update own profile" ON profiles;
+  CREATE POLICY "Allow user to update own profile"
+    ON profiles FOR UPDATE
+    TO authenticated
+    USING (id = auth.uid() OR is_admin())
+    WITH CHECK (id = auth.uid() OR is_admin());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- ------------------------------------------------------------
+-- ACCESS REQUESTS POLICIES
+-- ------------------------------------------------------------
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow anon to submit access request" ON access_requests;
+  CREATE POLICY "Allow anon to submit access request"
+    ON access_requests FOR INSERT
+    TO anon, authenticated
+    WITH CHECK (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Only admin can view access requests" ON access_requests;
+  CREATE POLICY "Only admin can view access requests"
+    ON access_requests FOR SELECT
+    TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Only admin can update access requests" ON access_requests;
+  CREATE POLICY "Only admin can update access requests"
+    ON access_requests FOR UPDATE
+    TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- ------------------------------------------------------------
+-- PROJECTS POLICIES
+-- ------------------------------------------------------------
+-- Drop old permissive policies
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Allow all for anon" ON projects;
-  CREATE POLICY "Allow all for anon" ON projects FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Anyone (including guests/anon) can view projects for demo
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Anyone can view projects" ON projects;
+  CREATE POLICY "Anyone can view projects"
+    ON projects FOR SELECT
+    TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only authenticated contractors/admin with must_reset_password = false can INSERT
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can insert projects" ON projects;
+  CREATE POLICY "Active contractors can insert projects"
+    ON projects FOR INSERT
+    TO authenticated
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only active contractors/admin can UPDATE
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can update projects" ON projects;
+  CREATE POLICY "Active contractors can update projects"
+    ON projects FOR UPDATE
+    TO authenticated
+    USING (is_active_contractor())
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only admin can DELETE projects
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Only admin can delete projects" ON projects;
+  CREATE POLICY "Only admin can delete projects"
+    ON projects FOR DELETE
+    TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- ------------------------------------------------------------
+-- EXPENSES POLICIES
+-- ------------------------------------------------------------
+-- Drop old permissive policies
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow all for anon" ON expenses;
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Anyone can view expenses
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Anyone can view expenses" ON expenses;
+  CREATE POLICY "Anyone can view expenses"
+    ON expenses FOR SELECT
+    TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only active contractors/admin can INSERT expenses
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can insert expenses" ON expenses;
+  CREATE POLICY "Active contractors can insert expenses"
+    ON expenses FOR INSERT
+    TO authenticated
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only active contractors/admin can UPDATE expenses
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can update expenses" ON expenses;
+  CREATE POLICY "Active contractors can update expenses"
+    ON expenses FOR UPDATE
+    TO authenticated
+    USING (is_active_contractor())
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- Only active contractors/admin can DELETE expenses
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can delete expenses" ON expenses;
+  CREATE POLICY "Active contractors can delete expenses"
+    ON expenses FOR DELETE
+    TO authenticated
+    USING (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+-- ------------------------------------------------------------
+-- STORAGE POLICIES (receipts bucket)
+-- ------------------------------------------------------------
+-- Ensure receipts bucket exists
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('receipts', 'receipts', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Public can view receipts" ON storage.objects;
+  CREATE POLICY "Public can view receipts"
+    ON storage.objects FOR SELECT
+    TO anon, authenticated
+    USING (bucket_id = 'receipts');
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
 DO $$ BEGIN
-  DROP POLICY IF EXISTS "Allow all for anon" ON expenses;
-  CREATE POLICY "Allow all for anon" ON expenses FOR ALL USING (true) WITH CHECK (true);
+  DROP POLICY IF EXISTS "Active contractors can upload receipts" ON storage.objects;
+  CREATE POLICY "Active contractors can upload receipts"
+    ON storage.objects FOR INSERT
+    TO authenticated
+    WITH CHECK (bucket_id = 'receipts' AND is_active_contractor());
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
+
+-- ============================================================
+-- 9. ADMIN BOOTSTRAP INSTRUCTIONS
+-- ============================================================
+-- After creating your user in Supabase Dashboard (Authentication -> Users -> Add user),
+-- run this query to elevate your user to Admin with immediate full access:
+--
+-- UPDATE public.profiles
+-- SET role = 'admin', must_reset_password = false
+-- WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@example.com');

@@ -1,7 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { isSupabaseConfigured } from './supabase';
+import { createClient as createServerClient } from './supabase/server';
+
+async function getDb() {
+  return await createServerClient();
+}
 import {
   type Project,
   type Expense,
@@ -47,6 +52,7 @@ export async function getProjects(): Promise<{
       };
     }
 
+    const supabase = await getDb();
     const { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('*')
@@ -113,6 +119,7 @@ export async function getProjectById(
       return fallback || null;
     }
 
+    const supabase = await getDb();
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('*')
@@ -195,6 +202,22 @@ export async function createProject(formData: {
       };
     }
 
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required: Only approved contractors can create projects.' };
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('must_reset_password')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.must_reset_password) {
+      return { success: false, error: 'Mandatory password update required before creating projects.' };
+    }
+
     const now = new Date().toISOString();
     const newProject: Record<string, unknown> = {
       name,
@@ -260,6 +283,12 @@ export async function updateProject(
     }
     if (!id) {
       return { success: false, error: 'Valid project ID is required.' };
+    }
+
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required to update projects.' };
     }
 
     const updates: Record<string, unknown> = {};
@@ -330,6 +359,12 @@ export async function completeProject(
       return { success: false, error: 'Valid project ID is required.' };
     }
 
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required to complete projects.' };
+    }
+
     const now = new Date().toISOString();
     const { error } = await supabase
       .from('projects')
@@ -359,7 +394,7 @@ export async function completeProject(
 
 /**
  * Permanently delete a project and all associated expenses.
- * Allowed for both active and completed projects.
+ * Allowed only for admin role.
  */
 export async function deleteProject(
   id: string
@@ -371,6 +406,22 @@ export async function deleteProject(
 
     if (!id || typeof id !== 'string') {
       return { success: false, error: 'Valid project ID is required.' };
+    }
+
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required to delete projects.' };
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.role !== 'admin') {
+      return { success: false, error: 'Admin privileges required: Only administrator (Qazi Israr) can delete projects.' };
     }
 
     // 1. Delete associated expenses first
@@ -434,6 +485,22 @@ export async function createExpense(formData: {
         success: false,
         error: 'Description / Item Name is required for Miscellaneous (Misc) expenses.',
       };
+    }
+
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required: Only approved contractors can log expenses.' };
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('must_reset_password')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.must_reset_password) {
+      return { success: false, error: 'Mandatory password update required before logging expenses.' };
     }
 
     // Verify project is active (completed projects are sealed)
@@ -505,6 +572,12 @@ export async function uploadReceiptAction(
       return { url: null, error: 'File and expense ID are required.' };
     }
 
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { url: null, error: 'Sign in required to upload receipts.' };
+    }
+
     if (file.size > 5 * 1024 * 1024) {
       return { url: null, error: 'File too large. Maximum size is 5MB.' };
     }
@@ -557,6 +630,8 @@ export async function seedDemoData(): Promise<{ success: boolean; count?: number
     if (!isSupabaseConfigured) {
       return { success: false, error: NOT_CONFIGURED_MSG };
     }
+
+    const supabase = await getDb();
 
     for (const p of fallbackProjects) {
       const { data: newProj, error: pErr } = await supabase
@@ -624,6 +699,12 @@ export async function updateExpenseReceipt(
       return { success: false, error: 'Expense ID and receipt URL are required.' };
     }
 
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required to update receipt.' };
+    }
+
     const { error } = await supabase
       .from('expenses')
       .update({ receipt_url: receiptUrl })
@@ -662,6 +743,12 @@ export async function softDeleteExpense(
 
     if (!expenseId) {
       return { success: false, error: 'Valid expense ID is required.' };
+    }
+
+    const supabase = await getDb();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, error: 'Sign in required to delete expenses.' };
     }
 
     // Verify project is not completed (completed projects are sealed from deletions)
@@ -814,6 +901,7 @@ export async function testDatabaseConnection(): Promise<{
         error: 'Missing environment variables. Please check Vercel settings.',
       };
     }
+    const supabase = await getDb();
     const { count, error } = await supabase
       .from('projects')
       .select('*', { count: 'exact', head: true });
