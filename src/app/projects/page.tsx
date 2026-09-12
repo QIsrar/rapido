@@ -6,9 +6,17 @@ import { getProjects } from '@/lib/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; highlighted?: string }>;
+}) {
+  const { tab, highlighted } = (await searchParams) || {};
   const { projects: allProjects } = await getProjects();
   const active = allProjects.filter((p) => p.status === 'active');
+
+  const initialFilter =
+    tab === 'completed' ? 'completed' : tab === 'active' ? 'active' : 'all';
 
   return (
     <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28">
@@ -38,7 +46,11 @@ export default async function ProjectsPage() {
           </div>
         </div>
       ) : (
-        <ProjectList projects={allProjects} />
+        <ProjectList
+          projects={allProjects}
+          initialFilter={initialFilter}
+          highlightedId={highlighted || ''}
+        />
       )}
 
       <AddExpenseDialog projects={active} />

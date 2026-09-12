@@ -155,7 +155,13 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
                         : 'bg-slate-200 text-slate-800 font-bold'
                     }`}
                   >
-                    {item.budget > 0 ? `${Math.round((item.spent / item.budget) * 100)}%` : '0%'}
+                    {item.budget > 0
+                      ? item.spent <= 0
+                        ? '0%'
+                        : (item.spent / item.budget) * 100 < 1
+                        ? `${((item.spent / item.budget) * 100).toFixed(1)}%`
+                        : `${Math.round((item.spent / item.budget) * 100)}%`
+                      : '0%'}
                   </span>
                 </div>
               </div>

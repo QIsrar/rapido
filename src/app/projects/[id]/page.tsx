@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, CheckCircle2, Receipt, MapPin, ExternalLink } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -33,7 +33,7 @@ export default async function ProjectDetailsPage({
   const project = await getProjectById(id);
 
   if (!project) {
-    notFound();
+    redirect('/');
   }
 
   const percentage = Math.min(
@@ -208,7 +208,7 @@ export default async function ProjectDetailsPage({
         </div>
 
         <Progress
-          value={percentage}
+          value={project.total_spent > 0 ? Math.max(percentage, 2) : 0}
           className={`h-3 rounded-full bg-slate-100 mb-2 animate-progress-fill ${
             isOverBudget
               ? '[&>div]:bg-red-500'
@@ -219,7 +219,13 @@ export default async function ProjectDetailsPage({
         />
 
         <div className="flex justify-between items-center text-xs text-slate-500 pt-1 font-semibold">
-          <span>{percentage.toFixed(1)}% of budget utilized</span>
+          <span>
+            {project.total_spent <= 0
+              ? '0% of budget utilized'
+              : percentage < 0.1
+              ? '<0.1% of budget utilized'
+              : `${percentage.toFixed(1)}% of budget utilized`}
+          </span>
           <span className={isOverBudget ? 'text-red-600 font-bold' : isWarning ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
             {isOverBudget ? `Over limit by ${formatPKR(Math.abs(remaining))}` : `${formatPKR(remaining)} available`}
           </span>
@@ -254,7 +260,7 @@ export default async function ProjectDetailsPage({
       )}
 
       {/* Expenses list */}
-      <section className="mb-6 animate-slide-up" style={{ animationDelay: '180ms' }}>
+      <section id="expenses" className="mb-6 animate-slide-up scroll-mt-6" style={{ animationDelay: '180ms' }}>
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
             All Expenses ({sortedExpenses.length})

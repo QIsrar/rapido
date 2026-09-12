@@ -12,8 +12,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Loader2, Home, Hammer, Wrench, X, AlertCircle, MapPin, Sparkles } from 'lucide-react';
-import { PROJECT_TYPES, type ProjectType } from '@/types/database';
+import { PROJECT_TYPES, MIN_BUDGET_BY_TYPE, type ProjectType } from '@/types/database';
 import { createProject } from '@/lib/actions';
+import { saveDraftProject } from '@/lib/offline-store';
 
 interface AddProjectDialogProps {
   buttonVariant?: 'primary' | 'outline' | 'compact';
@@ -73,6 +74,46 @@ export function AddProjectDialog({
       return;
     }
 
+    if (budget.includes('.') || !Number.isInteger(budgetNum)) {
+      setErrorMsg('Total budget must be a whole number (no decimals or paisas).');
+      return;
+    }
+
+    const minRequired = MIN_BUDGET_BY_TYPE[type] || 10000;
+    if (budgetNum < minRequired) {
+      setErrorMsg(
+        `Minimum budget for ${type} is Rs. ${minRequired.toLocaleString('en-PK')} PKR (Maintenance: Rs. 10k, Renovation: Rs. 50k, New Build: Rs. 100k).`
+      );
+      return;
+    }
+
+    // Check if device is offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      saveDraftProject({
+        name: trimmedName,
+        type,
+        total_budget: budgetNum,
+        location: location.trim() || undefined,
+      });
+
+      setCelebrationName(trimmedName);
+      setShowCelebration(true);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('rapido-draft-updated'));
+      }
+
+      setTimeout(() => {
+        setShowCelebration(false);
+      }, 5000);
+
+      setName('');
+      setType('New Build');
+      setBudget('');
+      setLocation('');
+      setOpen(false);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await createProject({
@@ -83,6 +124,30 @@ export function AddProjectDialog({
       });
 
       if (!res.success || !res.data) {
+        // If network failed, save as draft
+        if (res.error?.includes('fetch failed') || res.error?.includes('Network')) {
+          saveDraftProject({
+            name: trimmedName,
+            type,
+            total_budget: budgetNum,
+            location: location.trim() || undefined,
+          });
+          setCelebrationName(trimmedName);
+          setShowCelebration(true);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('rapido-draft-updated'));
+          }
+          setTimeout(() => {
+            setShowCelebration(false);
+          }, 5000);
+          setName('');
+          setType('New Build');
+          setBudget('');
+          setLocation('');
+          setOpen(false);
+          return;
+        }
+
         setErrorMsg(res.error || 'Failed to create project.');
         setIsSubmitting(false);
         return;
@@ -90,16 +155,6 @@ export function AddProjectDialog({
 
       const createdId = res.data.id;
       const createdName = res.data.name;
-
-      // Store recently created project ID in sessionStorage for dashboard highlighting
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('recentlyCreatedProjectId', createdId);
-        window.dispatchEvent(
-          new CustomEvent('project-created', {
-            detail: { id: createdId, name: createdName },
-          })
-        );
-      }
 
       // Trigger 5s celebration animation
       setCelebrationName(createdName);
@@ -172,9 +227,6 @@ export function AddProjectDialog({
                   <h4 className="text-sm font-black text-white flex items-center gap-1.5">
                     Project Created Successfully!
                   </h4>
-                  <p className="text-xs font-semibold text-orange-400 mt-0.5 line-clamp-1">
-                    "{celebrationName}" is highlighted on your dashboard
-                  </p>
                 </div>
               </div>
               <button
@@ -202,6 +254,7 @@ export function AddProjectDialog({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="bottom"
+          showCloseButton={false}
           className="h-[84dvh] rounded-t-3xl border-t-2 border-slate-300 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
           <SheetHeader className="pb-3 text-left">
@@ -307,12 +360,22 @@ export function AddProjectDialog({
                   id="projectBudget"
                   type="number"
                   inputMode="numeric"
-                  placeholder="300000"
+                  step="1"
+                  min={MIN_BUDGET_BY_TYPE[type]}
+                  placeholder={String(MIN_BUDGET_BY_TYPE[type])}
                   value={budget}
                   onChange={(e) => setBudget(e.target.value)}
                   required
                   className="h-14 pl-14 text-xl font-black rounded-xl border-2 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-200"
                 />
+              </div>
+              <div className="flex items-center justify-between text-[11px] font-bold px-0.5">
+                <span className="text-slate-600">
+                  Minimum: <span className="text-slate-900 font-extrabold">Rs. {MIN_BUDGET_BY_TYPE[type].toLocaleString('en-PK')} PKR</span>
+                </span>
+                <span className="text-slate-500 font-semibold">
+                  Whole rupees only
+                </span>
               </div>
               {/* Live Pakistani Lakh/Crore preview to prevent input typos */}
               {formatBudgetPreview(budget) && (

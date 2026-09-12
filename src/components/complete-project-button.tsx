@@ -31,16 +31,19 @@ export function CompleteProjectButton({
     try {
       const res = await completeProject(projectId);
       if (res.success) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('recentlyCompletedProjectId', projectId);
+        }
         // Show celebration animation in modal
         setIsSuccess(true);
-        // Wait 1.5s for the user to enjoy the completion animation, then navigate to dashboard
+        // Wait for completion animation, then navigate to completed tab
         setTimeout(() => {
           setIsOpen(false);
           startTransition(() => {
-            router.push('/');
+            router.push(`/projects?tab=completed&highlighted=${projectId}`);
             router.refresh();
           });
-        }, 1600);
+        }, 1400);
       } else {
         setErrorMsg(res.error || 'Failed to complete project.');
       }
@@ -70,14 +73,14 @@ export function CompleteProjectButton({
                 &ldquo;{projectName}&rdquo;
               </h3>
               <p className="text-xs font-semibold text-slate-500 mt-1">
-                Archived to Completed Projects. Returning to Dashboard...
+                Archived to Completed Projects. Opening Completed tab...
               </p>
             </div>
             {/* Countdown redirect bar */}
             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-4">
               <div
                 className="bg-emerald-500 h-full w-full origin-left"
-                style={{ animation: 'shrink 1.5s linear forwards' }}
+                style={{ animation: 'shrink 1.4s linear forwards' }}
               />
             </div>
           </div>

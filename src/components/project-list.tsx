@@ -7,10 +7,16 @@ import type { ProjectWithExpenses } from '@/types/database';
 
 interface ProjectListProps {
   projects: ProjectWithExpenses[];
+  initialFilter?: 'all' | 'active' | 'completed';
+  highlightedId?: string;
 }
 
-export function ProjectList({ projects }: ProjectListProps) {
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+export function ProjectList({
+  projects,
+  initialFilter = 'all',
+  highlightedId = '',
+}: ProjectListProps) {
+  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>(initialFilter);
   const [search, setSearch] = useState('');
 
   const activeCount = useMemo(
@@ -63,21 +69,21 @@ export function ProjectList({ projects }: ProjectListProps) {
         )}
       </div>
 
-      {/* Filter Tabs — Bold, High-Contrast Distinct Active Styles */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-200/80 rounded-2xl border-2 border-slate-300">
+      {/* Filter Tabs — Perfectly Balanced 3-Column Grid */}
+      <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-slate-200/80 rounded-2xl border-2 border-slate-300">
         <button
           type="button"
           onClick={() => setFilter('all')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs rounded-xl transition-all tap-scale ${
+          className={`w-full flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1 sm:px-2 text-xs rounded-xl transition-all tap-scale ${
             filter === 'all'
               ? 'bg-slate-900 text-white font-black shadow-md ring-1 ring-black/10'
               : 'text-slate-700 font-bold hover:text-slate-900 hover:bg-slate-300/60'
           }`}
         >
-          <Layers className="h-4 w-4" />
-          <span>All</span>
+          <Layers className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">All</span>
           <span
-            className={`ml-0.5 text-[10px] px-2 py-0.5 rounded-full font-black ${
+            className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[20px] text-center leading-none ${
               filter === 'all'
                 ? 'bg-slate-700 text-white'
                 : 'bg-slate-300 text-slate-700'
@@ -90,16 +96,16 @@ export function ProjectList({ projects }: ProjectListProps) {
         <button
           type="button"
           onClick={() => setFilter('active')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs rounded-xl transition-all tap-scale ${
+          className={`w-full flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1 sm:px-2 text-xs rounded-xl transition-all tap-scale ${
             filter === 'active'
               ? 'bg-orange-600 text-white font-black shadow-md ring-1 ring-orange-700/20'
               : 'text-slate-700 font-bold hover:text-slate-900 hover:bg-slate-300/60'
           }`}
         >
-          <Briefcase className="h-4 w-4" />
-          <span>Active</span>
+          <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Active</span>
           <span
-            className={`ml-0.5 text-[10px] px-2 py-0.5 rounded-full font-black ${
+            className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[20px] text-center leading-none ${
               filter === 'active'
                 ? 'bg-orange-800 text-white'
                 : 'bg-slate-300 text-slate-700'
@@ -112,16 +118,16 @@ export function ProjectList({ projects }: ProjectListProps) {
         <button
           type="button"
           onClick={() => setFilter('completed')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs rounded-xl transition-all tap-scale ${
+          className={`w-full flex items-center justify-center gap-1 sm:gap-1.5 py-2.5 px-1 sm:px-2 text-xs rounded-xl transition-all tap-scale ${
             filter === 'completed'
               ? 'bg-emerald-600 text-white font-black shadow-md ring-1 ring-emerald-700/20'
               : 'text-slate-700 font-bold hover:text-slate-900 hover:bg-slate-300/60'
           }`}
         >
-          <CheckCircle2 className="h-4 w-4" />
-          <span>Completed</span>
+          <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+          <span className="truncate">Completed</span>
           <span
-            className={`ml-0.5 text-[10px] px-2 py-0.5 rounded-full font-black ${
+            className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[20px] text-center leading-none ${
               filter === 'completed'
                 ? 'bg-emerald-800 text-white'
                 : 'bg-slate-300 text-slate-700'
@@ -136,7 +142,11 @@ export function ProjectList({ projects }: ProjectListProps) {
       {filteredProjects.length > 0 ? (
         <div className="space-y-3">
           {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              highlightedId={highlightedId}
+            />
           ))}
         </div>
       ) : (

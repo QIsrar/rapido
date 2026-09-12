@@ -55,3 +55,10 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Transport/Fuel',
   'Misc',
 ];
+
+export const MIN_BUDGET_BY_TYPE: Record<ProjectType, number> = {
+  Maintenance: 10000,
+  Renovation: 50000,
+  'New Build': 100000,
+};
+

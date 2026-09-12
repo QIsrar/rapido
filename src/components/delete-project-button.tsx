@@ -42,11 +42,10 @@ export function DeleteProjectButton({
         setIsDeleted(true);
         setTimeout(() => {
           setIsOpen(false);
-          startTransition(() => {
-            router.push('/');
-            router.refresh();
-          });
-        }, 1200);
+          if (typeof window !== 'undefined') {
+            window.location.replace('/');
+          }
+        }, 900);
       } else {
         setErrorMsg(res.error || 'Failed to delete project.');
       }

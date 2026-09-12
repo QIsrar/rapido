@@ -1,27 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ChevronRight, MapPin, ExternalLink } from 'lucide-react';
+import { ChevronRight, MapPin, ExternalLink, CheckCircle2 } from 'lucide-react';
 import type { ProjectWithExpenses } from '@/types/database';
 import { formatPKR } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: ProjectWithExpenses;
   index?: number;
+  highlightedId?: string;
 }
 
-export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
+export function ProjectCard({ project, index = 0, highlightedId = '' }: ProjectCardProps) {
   const [isRecentlyCreated, setIsRecentlyCreated] = useState(false);
+  const [isRecentlyCompleted, setIsRecentlyCompleted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
       const recentId = sessionStorage.getItem('recentlyCreatedProjectId');
       if (recentId === project.id) {
         setIsRecentlyCreated(true);
+      }
+      const completedId = sessionStorage.getItem('recentlyCompletedProjectId');
+      if (completedId === project.id || highlightedId === project.id) {
+        setIsRecentlyCompleted(true);
+        setTimeout(() => {
+          cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
       }
     } catch {
       // Ignore storage errors
@@ -36,7 +46,7 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
 
     window.addEventListener('project-created', handleCreated);
     return () => window.removeEventListener('project-created', handleCreated);
-  }, [project.id]);
+  }, [project.id, highlightedId]);
 
   const percentage = Math.min(
     project.total_budget > 0 ? (project.total_spent / project.total_budget) * 100 : 0,
@@ -52,6 +62,15 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
     Maintenance: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   };
 
+  const displayPercentage = () => {
+    if (project.total_spent <= 0) return '0% budget utilized';
+    if (percentage < 0.1) return '<0.1% budget utilized';
+    if (percentage < 1) return `${percentage.toFixed(1)}% budget utilized`;
+    return `${percentage.toFixed(0)}% budget utilized`;
+  };
+
+  const visualProgressValue = project.total_spent > 0 ? Math.max(percentage, 2) : 0;
+
   const isLocationUrl =
     project.location &&
     (project.location.startsWith('http://') ||
@@ -66,8 +85,11 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <Card
+        ref={cardRef}
         className={`group relative overflow-hidden bg-white p-4 transition-all duration-300 hover:shadow-elevated-hover hover:border-orange-400 active:scale-[0.985] tap-scale ${
-          isRecentlyCreated
+          isRecentlyCompleted
+            ? 'border-2 border-emerald-500 ring-4 ring-emerald-500/30 shadow-xl shadow-emerald-500/15 bg-gradient-to-b from-emerald-50/30 via-white to-white'
+            : isRecentlyCreated
             ? 'border-2 border-orange-500 ring-4 ring-orange-500/25 shadow-xl shadow-orange-500/10 bg-gradient-to-b from-orange-50/40 via-white to-white'
             : 'border border-slate-200/90 shadow-xs'
         }`}
@@ -75,7 +97,9 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
         {/* Top accent line */}
         <div
           className={`absolute inset-x-0 top-0 h-[3px] transition-opacity duration-300 ${
-            isRecentlyCreated
+            isRecentlyCompleted
+              ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-600 opacity-100'
+              : isRecentlyCreated
               ? 'bg-gradient-to-r from-orange-500 via-amber-400 to-orange-600 opacity-100'
               : 'bg-gradient-to-r from-orange-400 via-amber-400 to-orange-500 opacity-0 group-hover:opacity-100'
           }`}
@@ -88,7 +112,12 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
               <h3 className="font-black text-base text-slate-900 truncate">
                 {project.name}
               </h3>
-              {isRecentlyCreated && (
+              {isRecentlyCompleted && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-600 text-white shadow-xs animate-pulse">
+                  ✓ Just Completed
+                </span>
+              )}
+              {isRecentlyCreated && !isRecentlyCompleted && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-orange-600 text-white shadow-xs animate-pulse">
                   ✨ Just Created
                 </span>
@@ -180,7 +209,7 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
         {/* Progress Bar & Percentage */}
         <div className="mt-3 space-y-1.5">
           <Progress
-            value={percentage}
+            value={visualProgressValue}
             className={`h-2 rounded-full bg-slate-100 ${
               isOverBudget
                 ? '[&>div]:bg-red-500'
@@ -191,7 +220,7 @@ export function ProjectCard({ project, index = 0 }: ProjectCardProps) {
           />
           <div className="flex items-center justify-between text-[11px] font-bold">
             <span className={isOverBudget ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-slate-500'}>
-              {percentage.toFixed(0)}% budget utilized
+              {displayPercentage()}
             </span>
             <span className="text-slate-400 font-semibold">
               Tap to view details &rarr;

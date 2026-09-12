@@ -11,6 +11,7 @@ import {
   type ExpenseCategory,
   PROJECT_TYPES,
   EXPENSE_CATEGORIES,
+  MIN_BUDGET_BY_TYPE,
 } from '@/types/database';
 import {
   projects as fallbackProjects,
@@ -177,10 +178,21 @@ export async function createProject(formData: {
     }
     const budget = Number(formData.total_budget);
     if (isNaN(budget) || budget <= 0) {
-      return { success: false, error: 'Total budget must be a positive number.' };
+      return { success: false, error: 'Total budget must be a positive number in PKR.' };
+    }
+    if (!Number.isInteger(budget)) {
+      return { success: false, error: 'Total budget must be a whole number (no decimals or paisas).' };
     }
     if (!PROJECT_TYPES.includes(formData.type)) {
       return { success: false, error: 'Invalid project type.' };
+    }
+
+    const minThreshold = MIN_BUDGET_BY_TYPE[formData.type] || 10000;
+    if (budget < minThreshold) {
+      return {
+        success: false,
+        error: `Minimum budget for ${formData.type} is Rs. ${minThreshold.toLocaleString()} PKR (Maintenance: Rs. 10,000, Renovation: Rs. 50,000, New Build: Rs. 100,000).`,
+      };
     }
 
     const now = new Date().toISOString();

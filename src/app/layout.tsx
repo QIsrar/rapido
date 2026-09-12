@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { BottomNav } from '@/components/bottom-nav';
+import { OfflineManager } from '@/components/offline-manager';
 
 const inter = Inter({
   variable: '--font-sans',
@@ -61,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <OfflineManager />
         {/* Main scrollable area with bottom padding for nav */}
         <main className="flex-1 pb-20">{children}</main>
         <BottomNav />

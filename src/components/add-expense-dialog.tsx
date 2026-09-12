@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Briefcase,
   MapPin,
+  Sparkles,
 } from 'lucide-react';
 import {
   EXPENSE_CATEGORIES,
@@ -42,6 +43,7 @@ import {
   uploadReceiptAction,
 } from '@/lib/actions';
 import { uploadReceipt } from '@/lib/storage';
+import { saveDraftExpense } from '@/lib/offline-store';
 import { formatPKR } from '@/lib/utils';
 
 
@@ -77,6 +79,12 @@ export function AddExpenseDialog({
   const [newProjectLocation, setNewProjectLocation] = useState('');
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [quickProjectSuccess, setQuickProjectSuccess] = useState('');
+  const [isExpenseSuccess, setIsExpenseSuccess] = useState(false);
+  const [successDetails, setSuccessDetails] = useState<{
+    amount: number;
+    category: ExpenseCategory;
+    projectName: string;
+  } | null>(null);
 
   // Sync projects prop
   useEffect(() => {
@@ -200,6 +208,46 @@ export function AddExpenseDialog({
       return;
     }
 
+    const targetProjectName = selectedProject?.name || 'Project';
+
+    // Handle offline draft
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      saveDraftExpense({
+        project_id: projectId,
+        projectName: targetProjectName,
+        amount: amountNum,
+        category,
+        description: description.trim() || undefined,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('rapido-draft-updated'));
+      }
+
+      const targetProjectId = projectId;
+      setSuccessDetails({
+        amount: amountNum,
+        category,
+        projectName: targetProjectName,
+      });
+      setIsExpenseSuccess(true);
+
+      startTransition(() => {
+        router.push(`/projects/${targetProjectId}#expenses`);
+      });
+
+      setTimeout(() => {
+        setIsExpenseSuccess(false);
+        setSuccessDetails(null);
+        setAmount('');
+        setDescription('');
+        clearReceipt();
+        if (!defaultProjectId) setProjectId('');
+        setOpen(false);
+      }, 1400);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // 1. Create the expense record
@@ -211,6 +259,40 @@ export function AddExpenseDialog({
       });
 
       if (!res.success || !res.data) {
+        // If network failed, save as draft
+        if (res.error?.includes('fetch failed') || res.error?.includes('Network')) {
+          saveDraftExpense({
+            project_id: projectId,
+            projectName: targetProjectName,
+            amount: amountNum,
+            category,
+            description: description.trim() || undefined,
+          });
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('rapido-draft-updated'));
+          }
+          const targetProjectId = projectId;
+          setSuccessDetails({
+            amount: amountNum,
+            category,
+            projectName: targetProjectName,
+          });
+          setIsExpenseSuccess(true);
+          startTransition(() => {
+            router.push(`/projects/${targetProjectId}#expenses`);
+          });
+          setTimeout(() => {
+            setIsExpenseSuccess(false);
+            setSuccessDetails(null);
+            setAmount('');
+            setDescription('');
+            clearReceipt();
+            if (!defaultProjectId) setProjectId('');
+            setOpen(false);
+          }, 1400);
+          return;
+        }
+
         setErrorMsg(res.error || 'Failed to record expense.');
         setIsSubmitting(false);
         return;
@@ -244,18 +326,31 @@ export function AddExpenseDialog({
         }
       }
 
-      // Success — save target project ID and reset form
+      // Success — show in-sheet celebration animation & navigate behind the scenes
       const targetProjectId = projectId;
-      setAmount('');
-      setDescription('');
-      clearReceipt();
-      if (!defaultProjectId) setProjectId('');
-      setOpen(false);
+      setSuccessDetails({
+        amount: amountNum,
+        category,
+        projectName: targetProjectName,
+      });
+      setIsExpenseSuccess(true);
 
+      // Behind the scenes navigation directly to the project expenses section
       startTransition(() => {
-        router.push(`/projects/${targetProjectId}`);
+        router.push(`/projects/${targetProjectId}#expenses`);
         router.refresh();
       });
+
+      // Smooth countdown dismiss
+      setTimeout(() => {
+        setIsExpenseSuccess(false);
+        setSuccessDetails(null);
+        setAmount('');
+        setDescription('');
+        clearReceipt();
+        if (!defaultProjectId) setProjectId('');
+        setOpen(false);
+      }, 1400);
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Error recording expense.');
     } finally {
@@ -279,33 +374,69 @@ export function AddExpenseDialog({
         Log Expense
       </button>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={(val) => {
+        setOpen(val);
+        if (!val) {
+          setIsExpenseSuccess(false);
+          setSuccessDetails(null);
+        }
+      }}>
         <SheetContent
           side="bottom"
           className="h-[90dvh] rounded-t-3xl border-t-2 border-slate-300 bg-white px-5 pb-[env(safe-area-inset-bottom)]"
         >
-          <SheetHeader className="pb-3 text-left">
-            <SheetTitle className="text-xl font-black text-slate-900">
-              Log New Expense
-            </SheetTitle>
-            <p className="text-xs font-semibold text-slate-500">
-              Records timestamp and updates project spend instantly.
-            </p>
-          </SheetHeader>
-
-          {errorMsg && (
-            <div className="p-3 mb-3 rounded-xl bg-red-50 border-2 border-red-200 text-xs font-bold text-red-600 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
+          {isExpenseSuccess && successDetails ? (
+            <div className="py-14 px-3 text-center space-y-4 animate-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 border-4 border-emerald-400 text-emerald-600 flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/20 animate-bounce">
+                <CheckCircle2 className="w-9 h-9 stroke-[2.5]" />
+              </div>
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black border border-emerald-300 shadow-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  Logged New Expense Successfully!
+                </div>
+                <h3 className="text-3xl font-black text-slate-900">
+                  Rs. {successDetails.amount.toLocaleString('en-PK')}
+                </h3>
+                <p className="text-xs font-bold text-slate-600">
+                  {successDetails.category} · <span className="text-orange-600 font-black">{successDetails.projectName}</span>
+                </p>
+                <p className="text-[11px] font-semibold text-slate-400 pt-2">
+                  Navigating to project expenses...
+                </p>
+              </div>
+              {/* Animated countdown bar */}
+              <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-6 max-w-xs mx-auto">
+                <div
+                  className="bg-emerald-500 h-full w-full origin-left"
+                  style={{ animation: 'shrink 1.4s linear forwards' }}
+                />
+              </div>
             </div>
-          )}
+          ) : (
+            <>
+              <SheetHeader className="pb-3 text-left">
+                <SheetTitle className="text-xl font-black text-slate-900">
+                  Log New Expense
+                </SheetTitle>
+                <p className="text-xs font-semibold text-slate-500">
+                  Records timestamp and updates project spend instantly.
+                </p>
+              </SheetHeader>
 
-          {quickProjectSuccess && (
-            <div className="p-3 mb-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-xs font-bold text-emerald-700 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{quickProjectSuccess}</span>
-            </div>
-          )}
+              {errorMsg && (
+                <div className="p-3 mb-3 rounded-xl bg-red-50 border-2 border-red-200 text-xs font-bold text-red-600 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              {quickProjectSuccess && (
+                <div className="p-3 mb-3 rounded-xl bg-emerald-50 border-2 border-emerald-200 text-xs font-bold text-emerald-700 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>{quickProjectSuccess}</span>
+                </div>
+              )}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4 overflow-y-auto max-h-[calc(90dvh-120px)] pr-1">
             {/* Amount */}
@@ -635,6 +766,8 @@ export function AddExpenseDialog({
               </button>
             </div>
           </form>
+          </>
+          )}
         </SheetContent>
       </Sheet>
     </>
