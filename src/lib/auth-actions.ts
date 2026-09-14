@@ -507,3 +507,171 @@ export async function rejectAccessRequest(requestId: string): Promise<{
     return { success: false, error: message };
   }
 }
+
+/**
+ * Check if email exists in approved accounts and request a password reset
+ */
+export async function checkEmailAndRequestPasswordReset(email: string): Promise<{
+  success: boolean;
+  contractor?: {
+    fullName: string;
+    phone: string;
+    companyName: string;
+    email: string;
+  };
+  error?: string;
+}> {
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+
+    const supabase = await createClient();
+
+    // Check if approved access request exists for this email
+    const { data: request, error: reqError } = await supabase
+      .from('access_requests')
+      .select('*')
+      .eq('email', cleanEmail)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .maybeSingle();
+
+    if (reqError) {
+      console.warn('Error checking access requests for password reset:', reqError);
+    }
+
+    if (!request) {
+      return {
+        success: false,
+        error:
+          'No approved contractor account found with this email. Please check your spelling or request access.',
+      };
+    }
+
+    // Trigger Supabase's native reset email if configured
+    try {
+      await supabase.auth.resetPasswordForEmail(cleanEmail);
+    } catch {
+      // Non-blocking: WhatsApp/Admin direct path is the primary channel
+    }
+
+    return {
+      success: true,
+      contractor: {
+        fullName: request.full_name,
+        phone: request.phone,
+        companyName: request.company_name,
+        email: request.email,
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to process reset request';
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Admin Action: Generate a fresh temporary password for an approved contractor
+ * and reset must_reset_password = true
+ */
+export async function adminResetContractorPassword(contractorEmail: string): Promise<{
+  success: boolean;
+  credentials?: {
+    email: string;
+    tempPassword: string;
+    fullName: string;
+    phone: string;
+    companyName: string;
+  };
+  error?: string;
+}> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: 'Unauthorized. Admin login required.' };
+    }
+
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (adminProfile?.role !== 'admin') {
+      return {
+        success: false,
+        error: 'Access denied: Only Admin (Qazi Israr) can reset contractor passwords.',
+      };
+    }
+
+    const cleanEmail = contractorEmail.trim().toLowerCase();
+    const { data: req } = await supabase
+      .from('access_requests')
+      .select('*')
+      .eq('email', cleanEmail)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .maybeSingle();
+
+    if (!req) {
+      return { success: false, error: 'Approved contractor record not found.' };
+    }
+
+    const adminClient = getAdminClient();
+    const { data: userList, error: listError } = await adminClient.auth.admin.listUsers();
+    if (listError) {
+      return { success: false, error: `Failed to find user: ${listError.message}` };
+    }
+
+    const targetUser = userList.users.find((u) => u.email?.toLowerCase() === cleanEmail);
+    if (!targetUser) {
+      return { success: false, error: 'Auth user not found in Supabase auth system.' };
+    }
+
+    const tempPassword = generateStrongTempPassword();
+
+    // 1. Update user password in auth.users
+    const { error: updateError } = await adminClient.auth.admin.updateUserById(
+      targetUser.id,
+      {
+        password: tempPassword,
+        user_metadata: {
+          ...targetUser.user_metadata,
+          must_reset_password: true,
+        },
+      }
+    );
+
+    if (updateError) {
+      return { success: false, error: `Failed to update password: ${updateError.message}` };
+    }
+
+    // 2. Mark must_reset_password = true in profiles
+    await supabase
+      .from('profiles')
+      .update({
+        must_reset_password: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', targetUser.id);
+
+    return {
+      success: true,
+      credentials: {
+        email: req.email,
+        tempPassword,
+        fullName: req.full_name,
+        phone: req.phone,
+        companyName: req.company_name,
+      },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Password reset generation failed';
+    return { success: false, error: message };
+  }
+}
+

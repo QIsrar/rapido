@@ -6,8 +6,10 @@ import {
   getAccessRequests,
   approveAccessRequest,
   rejectAccessRequest,
+  adminResetContractorPassword,
   type AccessRequestRecord,
 } from '@/lib/auth-actions';
+import { withTimeout } from '@/lib/utils';
 import {
   ShieldCheck,
   ShieldAlert,
@@ -25,6 +27,7 @@ import {
   Check,
   Lock,
   UserCheck,
+  KeyRound,
 } from 'lucide-react';
 
 interface GeneratedCredentials {
@@ -111,6 +114,35 @@ export default function AdminPortalPage() {
     }
   }
 
+  async function handleResetPassword(req: AccessRequestRecord) {
+    if (
+      !confirm(
+        `Generate a new temporary password for ${req.full_name} (${req.email})? This will force password reset on their next sign in.`
+      )
+    ) {
+      return;
+    }
+
+    setActionLoadingId(req.id);
+    try {
+      const res = await withTimeout(adminResetContractorPassword(req.email));
+      if (res.success && res.credentials) {
+        setApprovedCredentials(res.credentials);
+        await fetchRequests();
+      } else {
+        alert(res.error || 'Failed to reset contractor password.');
+      }
+    } catch (err: unknown) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : 'Connection is slow or timed out. Please connect to a strong internet connection and try again.'
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   function formatWhatsAppLink(creds: GeneratedCredentials) {
     // Sanitize phone: strip non-digits, replace leading 0 with 92 if in Pakistan
     let phoneNum = creds.phone.replace(/[^0-9]/g, '');
@@ -119,7 +151,7 @@ export default function AdminPortalPage() {
     }
 
     const appUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rapido-henna.vercel.app';
-    const message = `Assalam-o-Alaikum ${creds.fullName}!\n\nYour contractor access for *Rapido Construction Job-Costing* (${creds.companyName}) has been approved by Qazi Israr.\n\n*Login Credentials:*\n🌐 App: ${appUrl}\n📧 Email: ${creds.email}\n🔑 Temporary Password: ${creds.tempPassword}\n\n*Important:* You will be prompted to set your own permanent password on your first login.\n\nWelcome to Rapido!`;
+    const message = `Assalam-o-Alaikum ${creds.fullName}!\n\nHere are your login credentials for *Rapido Construction Job-Costing* (${creds.companyName}) issued by Qazi Israr:\n\n🌐 App: ${appUrl}\n📧 Email: ${creds.email}\n🔑 Temporary Password: ${creds.tempPassword}\n\n*Important:* You will be prompted to verify this temporary password and set your own secure permanent password upon signing in.\n\nBest regards,\nRapido by QI Tyrix`;
 
     return `https://wa.me/${phoneNum}?text=${encodeURIComponent(message)}`;
   }
@@ -355,15 +387,28 @@ export default function AdminPortalPage() {
                   </button>
                 </div>
               ) : (
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <span>Reviewed</span>
-                  {req.reviewed_at && (
-                    <span>
-                      {new Date(req.reviewed_at).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <span>Reviewed</span>
+                    {req.reviewed_at && (
+                      <span>
+                        {new Date(req.reviewed_at).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  {req.status === 'approved' && (
+                    <button
+                      type="button"
+                      onClick={() => handleResetPassword(req)}
+                      disabled={actionLoadingId === req.id}
+                      className="py-1.5 px-2.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer tap-scale shrink-0 shadow-2xs"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>{actionLoadingId === req.id ? 'Resetting...' : 'Reset Pass'}</span>
+                    </button>
                   )}
                 </div>
               )}

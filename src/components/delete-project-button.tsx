@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Trash2, Loader2, AlertTriangle, X, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { deleteProject } from '@/lib/actions';
+import { withTimeout } from '@/lib/utils';
 import { useAuth } from './auth-context';
 
 interface DeleteProjectButtonProps {
@@ -33,7 +34,7 @@ export function DeleteProjectButton({
   const handleConfirmDelete = async () => {
     setErrorMsg('');
     try {
-      const res = await deleteProject(projectId);
+      const res = await withTimeout(deleteProject(projectId));
       if (res.success) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem(

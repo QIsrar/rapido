@@ -12,8 +12,8 @@ interface AuthContextType {
   isContractor: boolean;
   mustResetPassword: boolean;
   isAuthModalOpen: boolean;
-  authModalTab: 'signup' | 'signin';
-  openAuthModal: (tab?: 'signup' | 'signin') => void;
+  authModalTab: 'signup' | 'signin' | 'reset';
+  openAuthModal: (tab?: 'signup' | 'signin' | 'reset') => void;
   closeAuthModal: () => void;
   refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [authModalTab, setAuthModalTab] = useState<'signup' | 'signin'>('signin');
+  const [authModalTab, setAuthModalTab] = useState<'signup' | 'signin' | 'reset'>('signin');
 
   const refreshUser = useCallback(async () => {
     try {
@@ -57,10 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refreshUser]);
 
-  const openAuthModal = useCallback((tab: 'signup' | 'signin' = 'signin') => {
-    setAuthModalTab(tab);
-    setIsAuthModalOpen(true);
-  }, []);
+  const openAuthModal = useCallback(
+    (tab: 'signup' | 'signin' | 'reset' = 'signin') => {
+      setAuthModalTab(tab);
+      setIsAuthModalOpen(true);
+    },
+    []
+  );
 
   const closeAuthModal = useCallback(() => {
     setIsAuthModalOpen(false);

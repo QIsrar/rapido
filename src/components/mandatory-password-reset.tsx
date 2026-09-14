@@ -6,6 +6,7 @@ import {
   completeMandatoryPasswordReset,
   verifyCurrentTempPassword,
 } from '@/lib/auth-actions';
+import { withTimeout } from '@/lib/utils';
 import {
   ShieldAlert,
   Lock,
@@ -66,14 +67,18 @@ export function MandatoryPasswordReset() {
 
     setIsVerifyingCurrent(true);
     try {
-      const res = await verifyCurrentTempPassword(currentPassword);
+      const res = await withTimeout(verifyCurrentTempPassword(currentPassword));
       if (!res.success) {
         setVerifyError(res.error || 'Temporary password does not match.');
       } else {
         setIsCurrentVerified(true);
       }
-    } catch {
-      setVerifyError('Verification connection failed. Please try again.');
+    } catch (err: unknown) {
+      setVerifyError(
+        err instanceof Error
+          ? err.message
+          : 'Connection is slow or timed out. Please connect to a strong internet connection and try again.'
+      );
     } finally {
       setIsVerifyingCurrent(false);
     }
@@ -100,7 +105,9 @@ export function MandatoryPasswordReset() {
 
     setLoading(true);
     try {
-      const res = await completeMandatoryPasswordReset(currentPassword, newPassword);
+      const res = await withTimeout(
+        completeMandatoryPasswordReset(currentPassword, newPassword)
+      );
       if (!res.success) {
         setError(res.error || 'Failed to update password.');
       } else {
@@ -109,8 +116,12 @@ export function MandatoryPasswordReset() {
           await refreshUser();
         }, 1500);
       }
-    } catch {
-      setError('An unexpected error occurred. Please try again.');
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Connection is slow or timed out. Please connect to a strong internet connection and try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -256,6 +267,19 @@ export function MandatoryPasswordReset() {
                     </span>
                   )}
                 </div>
+
+                {/* Important Security Notice: Remember & Store Password */}
+                {isCurrentVerified && (
+                  <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 space-y-1 text-xs animate-in fade-in duration-200">
+                    <div className="flex items-center gap-1.5 font-black text-amber-900">
+                      <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Security Reminder: Save Your New Password</span>
+                    </div>
+                    <p className="text-[11px] font-semibold text-amber-800/90 leading-relaxed">
+                      Please remember your new password and write it down or save it in your own convenient, secret place (such as your phone&apos;s password manager, keychain, or private notes). Once updated, temporary credentials expire immediately and cannot be reused.
+                    </p>
+                  </div>
+                )}
 
                 {/* New Password input */}
                 <div>

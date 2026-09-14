@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, Loader2, AlertCircle, X, ShieldCheck, Sparkles } from 'lucide-react';
 import { completeProject } from '@/lib/actions';
+import { withTimeout } from '@/lib/utils';
 import { useAuth } from './auth-context';
 
 interface CompleteProjectButtonProps {
@@ -31,7 +32,7 @@ export function CompleteProjectButton({
   const handleConfirm = async () => {
     setErrorMsg('');
     try {
-      const res = await completeProject(projectId);
+      const res = await withTimeout(completeProject(projectId));
       if (res.success) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('recentlyCompletedProjectId', projectId);

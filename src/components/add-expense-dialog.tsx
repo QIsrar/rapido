@@ -44,7 +44,7 @@ import {
 } from '@/lib/actions';
 import { uploadReceipt } from '@/lib/storage';
 import { saveDraftExpense } from '@/lib/offline-store';
-import { formatPKR } from '@/lib/utils';
+import { formatPKR, withTimeout } from '@/lib/utils';
 import { useAuth } from './auth-context';
 
 interface AddExpenseDialogProps {
@@ -155,12 +155,14 @@ export function AddExpenseDialog({
 
     setIsCreatingProject(true);
     try {
-      const res = await createProject({
-        name: trimmedName,
-        type: newProjectType,
-        total_budget: budgetNum,
-        location: newProjectLocation.trim() || undefined,
-      });
+      const res = await withTimeout(
+        createProject({
+          name: trimmedName,
+          type: newProjectType,
+          total_budget: budgetNum,
+          location: newProjectLocation.trim() || undefined,
+        })
+      );
 
       if (res.success && res.data) {
         setLocalProjects((prev) => [res.data!, ...prev]);
@@ -251,17 +253,23 @@ export function AddExpenseDialog({
 
     setIsSubmitting(true);
     try {
-      // 1. Create the expense record
-      const res = await createExpense({
-        project_id: projectId,
-        amount: amountNum,
-        category,
-        description: description.trim() || undefined,
-      });
+      // 1. Create the expense record with explicit timeout
+      const res = await withTimeout(
+        createExpense({
+          project_id: projectId,
+          amount: amountNum,
+          category,
+          description: description.trim() || undefined,
+        })
+      );
 
       if (!res.success || !res.data) {
         // If network failed, save as draft
-        if (res.error?.includes('fetch failed') || res.error?.includes('Network')) {
+        if (
+          res.error?.includes('fetch failed') ||
+          res.error?.includes('Network') ||
+          res.error?.includes('timed out')
+        ) {
           saveDraftExpense({
             project_id: projectId,
             projectName: targetProjectName,

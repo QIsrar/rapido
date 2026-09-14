@@ -15,6 +15,7 @@ import { Plus, Loader2, Home, Hammer, Wrench, X, AlertCircle, MapPin, Sparkles }
 import { PROJECT_TYPES, MIN_BUDGET_BY_TYPE, type ProjectType } from '@/types/database';
 import { createProject } from '@/lib/actions';
 import { saveDraftProject } from '@/lib/offline-store';
+import { withTimeout } from '@/lib/utils';
 import { useAuth } from './auth-context';
 
 interface AddProjectDialogProps {
@@ -126,16 +127,22 @@ export function AddProjectDialog({
 
     setIsSubmitting(true);
     try {
-      const res = await createProject({
-        name: trimmedName,
-        type,
-        total_budget: budgetNum,
-        location: location.trim() || undefined,
-      });
+      const res = await withTimeout(
+        createProject({
+          name: trimmedName,
+          type,
+          total_budget: budgetNum,
+          location: location.trim() || undefined,
+        })
+      );
 
       if (!res.success || !res.data) {
         // If network failed, save as draft
-        if (res.error?.includes('fetch failed') || res.error?.includes('Network')) {
+        if (
+          res.error?.includes('fetch failed') ||
+          res.error?.includes('Network') ||
+          res.error?.includes('timed out')
+        ) {
           saveDraftProject({
             name: trimmedName,
             type,

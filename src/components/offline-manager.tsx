@@ -28,9 +28,12 @@ import {
   type DraftExpense,
 } from '@/lib/offline-store';
 import { createProject, createExpense } from '@/lib/actions';
+import { useAuth } from './auth-context';
+import { withTimeout } from '@/lib/utils';
 
 export function OfflineManager() {
   const router = useRouter();
+  const { user, isGuest, openAuthModal } = useAuth();
   const [, startTransition] = useTransition();
   const [isOffline, setIsOffline] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -64,6 +67,11 @@ export function OfflineManager() {
       return;
     }
 
+    // STRICT: Only sync drafts when an approved account is signed in (never in guest mode)
+    if (!user || isGuest) {
+      return;
+    }
+
     const projects = getDraftProjects();
     const expenses = getDraftExpenses();
 
@@ -77,15 +85,18 @@ export function OfflineManager() {
     let syncedProjectsCount = 0;
     let syncedExpensesCount = 0;
 
-    // 1. Sync projects first
+    // 1. Sync projects first with explicit timeout
     for (const proj of projects) {
       try {
-        const res = await createProject({
-          name: proj.name,
-          type: proj.type,
-          total_budget: proj.total_budget,
-          location: proj.location,
-        });
+        const res = await withTimeout(
+          createProject({
+            name: proj.name,
+            type: proj.type,
+            total_budget: proj.total_budget,
+            location: proj.location,
+          }),
+          10000
+        );
         if (res.success) {
           removeDraftProject(proj.tempId);
           syncedProjectsCount++;
@@ -95,15 +106,18 @@ export function OfflineManager() {
       }
     }
 
-    // 2. Sync expenses
+    // 2. Sync expenses with explicit timeout
     for (const exp of expenses) {
       try {
-        const res = await createExpense({
-          project_id: exp.project_id,
-          amount: exp.amount,
-          category: exp.category,
-          description: exp.description,
-        });
+        const res = await withTimeout(
+          createExpense({
+            project_id: exp.project_id,
+            amount: exp.amount,
+            category: exp.category,
+            description: exp.description,
+          }),
+          10000
+        );
         if (res.success) {
           removeDraftExpense(exp.tempId);
           syncedExpensesCount++;
@@ -130,7 +144,7 @@ export function OfflineManager() {
     } else {
       setSyncStatusMsg(null);
     }
-  }, [router, startTransition, refreshDrafts]);
+  }, [user, isGuest, router, startTransition, refreshDrafts]);
 
   useEffect(() => {
     // 1. Register Service Worker
@@ -305,7 +319,9 @@ export function OfflineManager() {
             >
               <CloudUpload className="h-4 w-4 text-orange-400 shrink-0" />
               <p className="text-xs font-bold text-slate-200 truncate">
-                {pendingDraftsCount} draft{pendingDraftsCount === 1 ? '' : 's'} ready to upload
+                {isGuest
+                  ? `${pendingDraftsCount} offline draft${pendingDraftsCount === 1 ? '' : 's'} (Sign in to sync)`
+                  : `${pendingDraftsCount} draft${pendingDraftsCount === 1 ? '' : 's'} ready to upload`}
               </p>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -319,19 +335,29 @@ export function OfflineManager() {
               >
                 View
               </button>
-              <button
-                type="button"
-                onClick={syncDrafts}
-                disabled={isSyncing}
-                className="px-3 py-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-              >
-                {isSyncing ? (
-                  <RefreshCw className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Wifi className="h-3 w-3" />
-                )}
-                Sync Now
-              </button>
+              {isGuest ? (
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('signin')}
+                  className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black rounded-lg transition-all cursor-pointer tap-scale"
+                >
+                  Sign In to Sync
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={syncDrafts}
+                  disabled={isSyncing}
+                  className="px-3 py-1 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white text-xs font-black rounded-lg transition-all flex items-center gap-1 cursor-pointer tap-scale"
+                >
+                  {isSyncing ? (
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Wifi className="h-3 w-3" />
+                  )}
+                  Sync Now
+                </button>
+              )}
             </div>
           </div>
         </div>
