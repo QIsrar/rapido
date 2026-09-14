@@ -52,12 +52,7 @@ export function AuthModal() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState<{
-    fullName: string;
-    phone: string;
-    companyName: string;
-    email: string;
-  } | null>(null);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
   if (!isAuthModalOpen) return null;
 
@@ -120,17 +115,15 @@ export function AuthModal() {
   async function handlePasswordResetSubmit(e: React.FormEvent) {
     e.preventDefault();
     setResetError(null);
-    setResetSuccess(null);
+    setResetSuccess(false);
     setResetLoading(true);
 
     try {
       const res = await withTimeout(checkEmailAndRequestPasswordReset(resetEmail));
       if (!res.success) {
-        setResetError(
-          res.error || 'No approved contractor account found with this email.'
-        );
-      } else if (res.contractor) {
-        setResetSuccess(res.contractor);
+        setResetError(res.error || 'Please enter a valid email address.');
+      } else {
+        setResetSuccess(true);
       }
     } catch (err: unknown) {
       setResetError(
@@ -148,7 +141,7 @@ export function AuthModal() {
     setSignInError(null);
     setRequestError(null);
     setResetError(null);
-    setResetSuccess(null);
+    setResetSuccess(false);
     closeAuthModal();
   }
 
@@ -278,24 +271,24 @@ export function AuthModal() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-base font-black text-foreground">
-                      Account Verified in Database!
+                      Request Processed
                     </h3>
-                    <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                      Found active contractor profile for <strong className="text-foreground">{resetSuccess.fullName}</strong>.
+                    <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
+                      If this email is registered, you will see a prompt to contact the admin via WhatsApp for a temporary password.
                     </p>
                   </div>
 
                   <div className="p-3.5 bg-muted/60 rounded-2xl border border-border/80 text-left text-xs space-y-2.5">
                     <div className="flex items-center gap-1.5 font-bold text-foreground">
                       <KeyRound className="w-4 h-4 text-orange-500 shrink-0" />
-                      <span>Next Step: Obtain Temporary Reset Password</span>
+                      <span>Contact Admin for Temporary Password</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Admin (Qazi Israr) has been notified. For instant 1-minute assistance, click below to message Admin directly on WhatsApp with your verified account details:
+                      To receive your secure temporary credentials directly, message Admin (Qazi Israr) on WhatsApp:
                     </p>
                     <a
                       href={`https://wa.me/923165951951?text=${encodeURIComponent(
-                        `Assalam-o-Alaikum Admin Qazi Israr,\n\nI requested a password reset for my Rapido contractor account:\n• Name: ${resetSuccess.fullName}\n• Email: ${resetSuccess.email}\n• Phone: ${resetSuccess.phone}\n\nPlease generate and send me a temporary password so I can log in and set my permanent password.`
+                        `Assalam-o-Alaikum Admin Qazi Israr,\n\nI requested a password reset for my Rapido contractor account (${resetEmail}).\n\nPlease generate and send me a temporary password to log in.`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -309,7 +302,7 @@ export function AuthModal() {
                   <button
                     type="button"
                     onClick={() => {
-                      setSignInEmail(resetSuccess.email);
+                      setSignInEmail(resetEmail);
                       openAuthModal('signin');
                     }}
                     className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl text-xs transition-colors cursor-pointer tap-scale shadow-sm"
@@ -417,7 +410,7 @@ export function AuthModal() {
                     onClick={() => {
                       setResetEmail(signInEmail || '');
                       setResetError(null);
-                      setResetSuccess(null);
+                      setResetSuccess(false);
                       openAuthModal('reset');
                     }}
                     className="text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"

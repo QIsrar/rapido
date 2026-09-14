@@ -77,6 +77,43 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_deleted_at ON expenses(deleted_at);
 
 -- ============================================================
+-- 3b. LABOR LOGS TABLE (Daily Attendance / Hazri / Dihaadi)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS labor_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  masons_count INT NOT NULL DEFAULT 0 CHECK (masons_count >= 0),
+  laborers_count INT NOT NULL DEFAULT 0 CHECK (laborers_count >= 0),
+  daily_rate_mason NUMERIC(12, 2) NOT NULL DEFAULT 2500.00 CHECK (daily_rate_mason >= 0),
+  daily_rate_laborer NUMERIC(12, 2) NOT NULL DEFAULT 1500.00 CHECK (daily_rate_laborer >= 0),
+  total_cost NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_labor_logs_project_id ON labor_logs(project_id);
+CREATE INDEX IF NOT EXISTS idx_labor_logs_date ON labor_logs(date);
+
+-- Trigger function to automatically compute total_cost on insert or update
+CREATE OR REPLACE FUNCTION public.compute_labor_total_cost()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.total_cost := (COALESCE(NEW.masons_count, 0) * COALESCE(NEW.daily_rate_mason, 2500.00)) +
+                    (COALESCE(NEW.laborers_count, 0) * COALESCE(NEW.daily_rate_laborer, 1500.00));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_labor_logs_total_cost ON labor_logs;
+CREATE TRIGGER trg_labor_logs_total_cost
+  BEFORE INSERT OR UPDATE ON labor_logs
+  FOR EACH ROW
+  EXECUTE FUNCTION public.compute_labor_total_cost();
+
+
+-- ============================================================
 -- 4. ACCESS REQUESTS TABLE (Public Sign-up / Contractor Onboarding)
 -- ============================================================
 
@@ -374,6 +411,50 @@ DO $$ BEGIN
     USING (is_active_contractor());
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
+
+-- ------------------------------------------------------------
+-- LABOR LOGS POLICIES (Daily Attendance / Hazri)
+-- Only authenticated contractors/admins can SELECT and INSERT/UPDATE/DELETE
+-- ------------------------------------------------------------
+ALTER TABLE labor_logs ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can select labor_logs" ON labor_logs;
+  CREATE POLICY "Active contractors can select labor_logs"
+    ON labor_logs FOR SELECT
+    TO authenticated
+    USING (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can insert labor_logs" ON labor_logs;
+  CREATE POLICY "Active contractors can insert labor_logs"
+    ON labor_logs FOR INSERT
+    TO authenticated
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can update labor_logs" ON labor_logs;
+  CREATE POLICY "Active contractors can update labor_logs"
+    ON labor_logs FOR UPDATE
+    TO authenticated
+    USING (is_active_contractor())
+    WITH CHECK (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Active contractors can delete labor_logs" ON labor_logs;
+  CREATE POLICY "Active contractors can delete labor_logs"
+    ON labor_logs FOR DELETE
+    TO authenticated
+    USING (is_active_contractor());
+EXCEPTION WHEN undefined_object THEN null;
+END $$;
+
 
 -- ------------------------------------------------------------
 -- STORAGE POLICIES (receipts bucket)

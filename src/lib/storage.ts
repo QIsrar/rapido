@@ -1,5 +1,6 @@
 import { isSupabaseConfigured } from './supabase';
 import { createClient } from './supabase/client';
+import { withTimeout } from './utils';
 
 const BUCKET = 'receipts';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
@@ -38,12 +39,14 @@ export async function uploadReceipt(
     const path = `${sanitizedExpenseId}-${timestamp}.${ext}`;
 
     const supabase = createClient();
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(path, file, {
+    const { error: uploadError } = await withTimeout(
+      supabase.storage.from(BUCKET).upload(path, file, {
         cacheControl: '31536000', // 1 year cache
         upsert: false,
-      });
+      }),
+      45000,
+      'Receipt upload timed out over weak network.'
+    );
 
     if (uploadError) {
       console.error('Receipt upload error:', uploadError);

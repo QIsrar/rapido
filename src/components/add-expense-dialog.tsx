@@ -307,7 +307,7 @@ export function AddExpenseDialog({
         return;
       }
 
-      // 2. Upload receipt if provided
+      // 2. Upload receipt if provided (use 45s timeout for mobile 3G networks)
       if (receiptFile && res.data.id) {
         let uploadedUrl: string | null = null;
 
@@ -315,7 +315,11 @@ export function AddExpenseDialog({
           const fd = new FormData();
           fd.append('file', receiptFile);
           fd.append('expenseId', res.data.id);
-          const srvRes = await uploadReceiptAction(fd);
+          const srvRes = await withTimeout(
+            uploadReceiptAction(fd),
+            45000,
+            'Receipt upload timed out over weak network.'
+          );
           if (srvRes.url) {
             uploadedUrl = srvRes.url;
           }
@@ -324,14 +328,22 @@ export function AddExpenseDialog({
         }
 
         if (!uploadedUrl) {
-          const clientRes = await uploadReceipt(receiptFile, res.data.id);
-          if (clientRes.url) {
-            uploadedUrl = clientRes.url;
+          try {
+            const clientRes = await withTimeout(
+              uploadReceipt(receiptFile, res.data.id),
+              45000,
+              'Receipt upload timed out over weak network.'
+            );
+            if (clientRes.url) {
+              uploadedUrl = clientRes.url;
+            }
+          } catch {
+            // Non-blocking: expense itself is recorded safely
           }
         }
 
         if (uploadedUrl) {
-          await updateExpenseReceipt(res.data.id, uploadedUrl);
+          await withTimeout(updateExpenseReceipt(res.data.id, uploadedUrl), 15000).catch(() => {});
         }
       }
 

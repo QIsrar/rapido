@@ -4,11 +4,11 @@ import { ArrowLeft, Calendar, CheckCircle2, Receipt, MapPin, ExternalLink } from
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ExpenseRow } from '@/components/expense-row';
 import { CompleteProjectButton } from '@/components/complete-project-button';
 import { DeleteProjectButton } from '@/components/delete-project-button';
 import { AddExpenseDialog } from '@/components/add-expense-dialog';
-import { getProjectById } from '@/lib/actions';
+import { ProjectDetailsTabs } from '@/components/project-details-tabs';
+import { getProjectById, getLaborLogs } from '@/lib/actions';
 import { formatPKR } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,10 @@ export default async function ProjectDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const project = await getProjectById(id);
+  const [project, laborLogs] = await Promise.all([
+    getProjectById(id),
+    getLaborLogs(id),
+  ]);
 
   if (!project) {
     redirect('/');
@@ -232,65 +235,15 @@ export default async function ProjectDetailsPage({
         </div>
       </Card>
 
-      {/* Category Breakdown */}
-      {topCategories.length > 0 && (
-        <section className="mb-5 animate-slide-up" style={{ animationDelay: '120ms' }}>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-            Spending by Category
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {topCategories.map(([cat, total], i) => (
-              <Card
-                key={cat}
-                className={`p-3 bg-white border border-slate-200 shadow-2xs animate-slide-up ${
-                  categoryAccentMap[cat] || 'accent-left-slate'
-                }`}
-                style={{ animationDelay: `${140 + i * 50}ms` }}
-              >
-                <p className="text-[11px] font-medium text-slate-500 truncate">
-                  {cat}
-                </p>
-                <p className="text-sm font-black text-slate-900 mt-0.5">
-                  {formatPKR(total)}
-                </p>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Expenses list */}
-      <section id="expenses" className="mb-6 animate-slide-up scroll-mt-6" style={{ animationDelay: '180ms' }}>
-        <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            All Expenses ({sortedExpenses.length})
-          </h2>
-          <div className="flex items-center gap-1 text-xs text-slate-500">
-            <Receipt className="h-3.5 w-3.5 text-slate-400" />
-            <span>PKR</span>
-          </div>
-        </div>
-
-        <Card className="bg-white border border-slate-200 shadow-xs divide-y-0 px-2">
-          {sortedExpenses.length === 0 ? (
-            <div className="py-10 text-center">
-              <Receipt className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs font-medium text-slate-500">
-                No expenses logged for this project yet.
-              </p>
-            </div>
-          ) : (
-            sortedExpenses.map((expense, i) => (
-              <div
-                key={expense.id}
-                className={i % 2 === 1 ? 'bg-slate-50/50 -mx-2 px-2 rounded-lg' : ''}
-              >
-                <ExpenseRow expense={expense} showDelete={!isCompleted} />
-              </div>
-            ))
-          )}
-        </Card>
-      </section>
+      {/* Interactive Tabs: Expenses & Labor Log (Hazri) */}
+      <ProjectDetailsTabs
+        project={project}
+        sortedExpenses={sortedExpenses}
+        topCategories={topCategories}
+        categoryAccentMap={categoryAccentMap}
+        isCompleted={isCompleted}
+        laborLogs={laborLogs}
+      />
 
       {/* Floating Action Button only for active projects */}
       {!isCompleted ? (

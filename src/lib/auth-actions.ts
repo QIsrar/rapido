@@ -509,16 +509,11 @@ export async function rejectAccessRequest(requestId: string): Promise<{
 }
 
 /**
- * Check if email exists in approved accounts and request a password reset
+ * Check if email exists in approved accounts and request a password reset.
+ * OWASP compliant: Always returns generic success to prevent account enumeration.
  */
 export async function checkEmailAndRequestPasswordReset(email: string): Promise<{
   success: boolean;
-  contractor?: {
-    fullName: string;
-    phone: string;
-    companyName: string;
-    email: string;
-  };
   error?: string;
 }> {
   try {
@@ -532,7 +527,7 @@ export async function checkEmailAndRequestPasswordReset(email: string): Promise<
     // Check if approved access request exists for this email
     const { data: request, error: reqError } = await supabase
       .from('access_requests')
-      .select('*')
+      .select('id, email, full_name, phone, company_name')
       .eq('email', cleanEmail)
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
@@ -542,30 +537,17 @@ export async function checkEmailAndRequestPasswordReset(email: string): Promise<
       console.warn('Error checking access requests for password reset:', reqError);
     }
 
-    if (!request) {
-      return {
-        success: false,
-        error:
-          'No approved contractor account found with this email. Please check your spelling or request access.',
-      };
+    if (request) {
+      // Trigger Supabase's native reset email if configured
+      try {
+        await supabase.auth.resetPasswordForEmail(cleanEmail);
+      } catch {
+        // Non-blocking: WhatsApp/Admin direct path is primary
+      }
     }
 
-    // Trigger Supabase's native reset email if configured
-    try {
-      await supabase.auth.resetPasswordForEmail(cleanEmail);
-    } catch {
-      // Non-blocking: WhatsApp/Admin direct path is the primary channel
-    }
-
-    return {
-      success: true,
-      contractor: {
-        fullName: request.full_name,
-        phone: request.phone,
-        companyName: request.company_name,
-        email: request.email,
-      },
-    };
+    // OWASP compliance: Return generic success regardless of existence to prevent enumeration
+    return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to process reset request';
     return { success: false, error: message };

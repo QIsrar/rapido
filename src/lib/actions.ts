@@ -10,6 +10,7 @@ async function getDb() {
 import {
   type Project,
   type Expense,
+  type LaborLog,
   type ProjectWithExpenses,
   type ProjectType,
   type ProjectStatus,
@@ -929,4 +930,201 @@ function getFallbackProjectsWithExpenses(): ProjectWithExpenses[] {
     };
   });
 }
+
+/**
+ * Fetch daily labor attendance logs for a project.
+ */
+export async function getLaborLogs(projectId: string): Promise<LaborLog[]> {
+  try {
+    if (!isSupabaseConfigured) {
+      return [];
+    }
+    const supabase = await getDb();
+    const { data, error } = await supabase
+      .from('labor_logs')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('getLaborLogs notice:', error.message);
+      return [];
+    }
+
+    return (data || []).map((row) => ({
+      id: row.id,
+      project_id: row.project_id,
+      date: row.date,
+      masons_count: Number(row.masons_count || 0),
+      laborers_count: Number(row.laborers_count || 0),
+      daily_rate_mason: Number(row.daily_rate_mason || 0),
+      daily_rate_laborer: Number(row.daily_rate_laborer || 0),
+      total_cost: Number(row.total_cost || 0),
+      notes: row.notes,
+      created_at: row.created_at,
+    }));
+  } catch (err) {
+    console.error('getLaborLogs exception:', err);
+    return [];
+  }
+}
+
+/**
+ * Create a new daily labor attendance log.
+ * Enforces authenticated contractor access, validates counts and rates,
+ * and recalculates total daily labor wage.
+ */
+export async function createLaborLog(data: {
+  projectId: string;
+  date?: string;
+  masonsCount: number;
+  laborersCount: number;
+  dailyRateMason?: number;
+  dailyRateLaborer?: number;
+  notes?: string;
+}): Promise<{ success: boolean; data?: LaborLog; error?: string }> {
+  try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
+    if (!data.projectId || typeof data.projectId !== 'string') {
+      return { success: false, error: 'Valid project ID is required.' };
+    }
+
+    const masons = Math.max(0, Math.floor(Number(data.masonsCount) || 0));
+    const laborers = Math.max(0, Math.floor(Number(data.laborersCount) || 0));
+
+    if (masons === 0 && laborers === 0) {
+      return {
+        success: false,
+        error: 'Please enter at least one mason or laborer for attendance.',
+      };
+    }
+
+    const rateMason = Math.max(0, Number(data.dailyRateMason ?? 2500));
+    const rateLaborer = Math.max(0, Number(data.dailyRateLaborer ?? 1500));
+    const computedTotal = masons * rateMason + laborers * rateLaborer;
+
+    const supabase = await getDb();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: 'Sign in required: Only approved contractors can log labor attendance.',
+      };
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('must_reset_password')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profile?.must_reset_password) {
+      return {
+        success: false,
+        error: 'Mandatory password update required before logging labor attendance.',
+      };
+    }
+
+    // Verify project is active
+    const { data: projectCheck } = await supabase
+      .from('projects')
+      .select('status')
+      .eq('id', data.projectId)
+      .single();
+
+    if (projectCheck && projectCheck.status === 'completed') {
+      return {
+        success: false,
+        error: 'This project is marked as completed and locked. Labor logs cannot be added.',
+      };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const logDate = data.date || todayStr;
+
+    const payload = {
+      project_id: data.projectId,
+      date: logDate,
+      masons_count: masons,
+      laborers_count: laborers,
+      daily_rate_mason: rateMason,
+      daily_rate_laborer: rateLaborer,
+      total_cost: computedTotal,
+      notes: data.notes?.trim() || null,
+      created_at: new Date().toISOString(),
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('labor_logs')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('createLaborLog error:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/projects/${data.projectId}`);
+    revalidatePath('/');
+    return { success: true, data: inserted };
+  } catch (err: unknown) {
+    console.error('createLaborLog exception:', err);
+    return {
+      success: false,
+      error: formatErrorMessage(err, 'Failed to log labor attendance'),
+    };
+  }
+}
+
+/**
+ * Delete a labor log entry.
+ */
+export async function deleteLaborLog(
+  id: string,
+  projectId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!isSupabaseConfigured) {
+      return { success: false, error: NOT_CONFIGURED_MSG };
+    }
+
+    const supabase = await getDb();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: 'Sign in required to delete labor logs.' };
+    }
+
+    const { error } = await supabase
+      .from('labor_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('deleteLaborLog error:', error);
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath('/');
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('deleteLaborLog exception:', err);
+    return {
+      success: false,
+      error: formatErrorMessage(err, 'Failed to delete labor log'),
+    };
+  }
+}
+
 

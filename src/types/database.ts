@@ -36,6 +36,19 @@ export interface Expense {
   deleted_at: string | null;
 }
 
+export interface LaborLog {
+  id: string;
+  project_id: string;
+  date: string;
+  masons_count: number;
+  laborers_count: number;
+  daily_rate_mason: number;
+  daily_rate_laborer: number;
+  total_cost: number;
+  notes?: string | null;
+  created_at: string;
+}
+
 // Computed type for dashboard display
 export interface ProjectWithExpenses extends Project {
   expenses: Expense[];
