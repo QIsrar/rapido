@@ -334,6 +334,8 @@ export function AuthModal() {
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <input
                         type="email"
+                        name="email"
+                        autoComplete="email"
                         required
                         value={resetEmail}
                         onChange={(e) => {
@@ -391,6 +393,8 @@ export function AuthModal() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type="email"
+                    name="email"
+                    autoComplete="email"
                     required
                     value={signInEmail}
                     onChange={(e) => setSignInEmail(e.target.value)}
@@ -422,6 +426,8 @@ export function AuthModal() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    autoComplete="current-password"
                     required
                     value={signInPassword}
                     onChange={(e) => setSignInPassword(e.target.value)}
@@ -484,6 +490,8 @@ export function AuthModal() {
                 </label>
                 <input
                   type="text"
+                  name="name"
+                  autoComplete="name"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
@@ -501,6 +509,8 @@ export function AuthModal() {
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
                       type="tel"
+                      name="tel"
+                      autoComplete="tel"
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
@@ -518,6 +528,8 @@ export function AuthModal() {
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
                       type="email"
+                      name="email"
+                      autoComplete="email"
                       required
                       value={signUpEmail}
                       onChange={(e) => setSignUpEmail(e.target.value)}
@@ -536,6 +548,8 @@ export function AuthModal() {
                   <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="text"
+                    name="organization"
+                    autoComplete="organization"
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -553,6 +567,8 @@ export function AuthModal() {
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <input
                     type="text"
+                    name="address-level2"
+                    autoComplete="address-level2"
                     required
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}

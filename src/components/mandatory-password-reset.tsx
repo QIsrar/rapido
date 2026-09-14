@@ -165,6 +165,17 @@ export function MandatoryPasswordReset() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Hidden username field for browser password managers (Chrome/Apple Keychain) */}
+              <input
+                type="email"
+                name="username"
+                autoComplete="username"
+                value={user?.email || ''}
+                readOnly
+                tabIndex={-1}
+                className="sr-only hidden"
+                aria-hidden="true"
+              />
               <p className="text-xs font-semibold text-slate-600 leading-relaxed">
                 Step 1: Enter your temporary password sent via WhatsApp/Email to verify ownership, then set your private permanent password.
               </p>
@@ -195,6 +206,8 @@ export function MandatoryPasswordReset() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type={showCurrent ? 'text' : 'password'}
+                      name="current-password"
+                      autoComplete="current-password"
                       disabled={isCurrentVerified}
                       value={currentPassword}
                       onChange={(e) => {
@@ -287,6 +300,8 @@ export function MandatoryPasswordReset() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type={showNew ? 'text' : 'password'}
+                      name="new-password"
+                      autoComplete="new-password"
                       disabled={!isCurrentVerified}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -314,6 +329,8 @@ export function MandatoryPasswordReset() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type={showConfirm ? 'text' : 'password'}
+                      name="confirm-password"
+                      autoComplete="new-password"
                       disabled={!isCurrentVerified}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
