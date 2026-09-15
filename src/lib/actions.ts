@@ -23,6 +23,7 @@ import {
   projects as fallbackProjects,
   expenses as fallbackExpenses,
 } from './placeholder-data';
+import { getLocalDateString } from './utils';
 
 const NOT_CONFIGURED_MSG =
   'Database not connected. Please verify your Supabase environment variables (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, or SUPABASE_URL and SUPABASE_ANON_KEY) in Vercel project settings, then redeploy.';
@@ -561,7 +562,7 @@ export async function createExpense(formData: {
       };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     const newExpense = {
       project_id: formData.project_id,
       amount,
@@ -1108,7 +1109,7 @@ export async function createLaborLog(data: {
       };
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString();
     const logDate = data.date || todayStr;
 
     const payload = {

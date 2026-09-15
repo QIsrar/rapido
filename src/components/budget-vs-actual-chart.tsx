@@ -60,7 +60,10 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
           Dedicated Left Y-Axis Scale Column:
           Isolated in its own fixed-width column so Y-axis labels NEVER overlap or collide with project bars!
         */}
-        <div className="w-12 shrink-0 flex flex-col justify-between text-right pr-2 pt-6 pb-14 text-[10px] font-black text-slate-700 border-r border-slate-200 select-none">
+        <div className="w-12 shrink-0 flex flex-col justify-between text-right pr-2 pt-6 pb-14 text-[10px] font-black text-slate-700 border-r border-slate-200 select-none relative">
+          <span className="absolute -top-1 right-2 text-[9px] font-bold uppercase tracking-wider text-slate-400">
+            PKR
+          </span>
           {[1, 0.75, 0.5, 0.25, 0].map((frac) => (
             <span key={frac} className="leading-none">
               {formatShortNum(Math.round(maxVal * frac))}
@@ -188,9 +191,9 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
         </div>
       </div>
 
-      {/* X-Axis Title & Scroll Helper */}
+      {/* Horizontal Axis Category Label & Scroll Helper */}
       <div className="flex items-center justify-between px-2 pt-1.5 pb-1 border-t border-slate-100 text-[11px] font-bold text-slate-500">
-        <span className="uppercase tracking-wider">X-Axis: Project Sites</span>
+        <span className="uppercase tracking-wider text-slate-600 font-bold">Projects / پراجیکٹس</span>
         {data.length > 3 && (
           <span className="text-[10px] font-semibold text-slate-400">
             Swipe left/right to view all projects &rarr;

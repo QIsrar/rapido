@@ -8,7 +8,7 @@ import { DashboardBanner } from '@/components/dashboard-banner';
 import { SeedButton } from '@/components/seed-button';
 import { UserStatusBadge } from '@/components/user-status-badge';
 import { getProjects } from '@/lib/actions';
-import { formatPKR } from '@/lib/utils';
+import { formatPKR, getLocalDateString } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +17,9 @@ export default async function DashboardPage() {
   const activeProjects = allProjects.filter((p) => p.status === 'active');
   const completedProjects = allProjects.filter((p) => p.status === 'completed');
 
-  // Today's date in YYYY-MM-DD
+  // Today's date in YYYY-MM-DD (local timezone, advances at 12:00 AM midnight)
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = getLocalDateString(now);
 
   // Calculate today's spend across all projects
   const allExpenses = allProjects.flatMap((p) => p.expenses);

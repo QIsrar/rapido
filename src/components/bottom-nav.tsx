@@ -16,8 +16,9 @@ export function BottomNav() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
 
-  // Completely opt out of BottomNav on printable / dedicated report views
-  if (pathname?.includes('/report')) {
+  // Completely opt out of BottomNav on printable / dedicated project report views (/projects/[id]/report),
+  // but keep BottomNav fully visible on the main Reports tab (/reports)!
+  if (pathname?.includes('/projects/') && pathname?.includes('/report')) {
     return null;
   }
 

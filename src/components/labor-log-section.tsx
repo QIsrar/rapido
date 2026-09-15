@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatPKR, withTimeout } from '@/lib/utils';
+import { formatPKR, withTimeout, getLocalDateString } from '@/lib/utils';
 import { createLaborLog, deleteLaborLog } from '@/lib/actions';
 import { type LaborLog } from '@/types/database';
 import { useAuth } from './auth-context';
@@ -48,8 +48,8 @@ export function LaborLogSection({
   const [logs, setLogs] = useState<LaborLog[]>(initialLogs);
   const [isPending, startTransition] = useTransition();
 
-  // Headcount form state
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Headcount form state (Local timezone: advances at 12:00 AM midnight)
+  const todayStr = getLocalDateString();
   const [date, setDate] = useState(todayStr);
   const [masonsCount, setMasonsCount] = useState(0);
   const [laborersCount, setLaborersCount] = useState(0);

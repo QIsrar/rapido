@@ -5,6 +5,17 @@ export function formatPKR(amount: number): string {
   return 'Rs. ' + Math.round(amount).toLocaleString('en-PK');
 }
 
+/**
+ * Returns YYYY-MM-DD formatted date in the user's local timezone.
+ * Unlike toISOString(), this advances immediately to the new date at 12:00 AM midnight local time.
+ */
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const NETWORK_TIMEOUT_MS = 12000;
 export const NETWORK_TIMEOUT_ERROR_MSG =
   'Connection is slow or timed out. Please connect to a strong internet connection and try again.';
