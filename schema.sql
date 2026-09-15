@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS projects (
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS location TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_projects_is_demo ON projects(is_demo);
 
@@ -474,10 +476,13 @@ END $$;
 -- ------------------------------------------------------------
 -- STORAGE POLICIES (receipts bucket)
 -- ------------------------------------------------------------
--- Ensure receipts bucket exists
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('receipts', 'receipts', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+-- Ensure receipts bucket exists with strict size limit (5MB) and image MIME types
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('receipts', 'receipts', true, 5242880, ARRAY['image/jpeg','image/png','image/webp'])
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp'];
 
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Public can view receipts" ON storage.objects;
@@ -508,11 +513,10 @@ END $$;
 -- WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@example.com');
 
 -- ============================================================
--- 10. DEMO SHOWCASE DATA TAGGING / MIGRATION
+-- 10. DEMO SHOWCASE DATA TAGGING & SELF-SEEDING
 -- ============================================================
 -- Tag existing showcase/test projects as demo projects so Guest Mode
--- continues to show rich demo data for prospective clients, while
--- keeping all new contractor projects strictly private (is_demo = false).
+-- continues to show rich demo data for prospective clients:
 UPDATE public.projects
 SET is_demo = true
 WHERE name IN (
@@ -521,4 +525,22 @@ WHERE name IN (
   'Supply Depot Maintenance',
   'Cantt Road Boundary Wall'
 );
+
+-- If any of the showcase demo projects don't exist yet, insert them with is_demo = true:
+INSERT INTO public.projects (name, type, total_budget, status, location, is_demo, start_date)
+SELECT 'Jinnahabad 10-Marla Build', 'New Build'::project_type, 4500000, 'active'::project_status, 'Jinnahabad, Abbottabad', true, NOW() - INTERVAL '60 days'
+WHERE NOT EXISTS (SELECT 1 FROM public.projects WHERE name = 'Jinnahabad 10-Marla Build');
+
+INSERT INTO public.projects (name, type, total_budget, status, location, is_demo, start_date)
+SELECT 'Mandian Plaza Renovation', 'Renovation'::project_type, 1800000, 'active'::project_status, 'Mandian, Abbottabad', true, NOW() - INTERVAL '45 days'
+WHERE NOT EXISTS (SELECT 1 FROM public.projects WHERE name = 'Mandian Plaza Renovation');
+
+INSERT INTO public.projects (name, type, total_budget, status, location, is_demo, start_date)
+SELECT 'Supply Depot Maintenance', 'Maintenance'::project_type, 350000, 'active'::project_status, 'Supply, Abbottabad', true, NOW() - INTERVAL '25 days'
+WHERE NOT EXISTS (SELECT 1 FROM public.projects WHERE name = 'Supply Depot Maintenance');
+
+INSERT INTO public.projects (name, type, total_budget, status, location, is_demo, start_date, completed_at)
+SELECT 'Cantt Road Boundary Wall', 'New Build'::project_type, 750000, 'completed'::project_status, 'Cantt Road, Abbottabad', true, NOW() - INTERVAL '90 days', NOW() - INTERVAL '20 days'
+WHERE NOT EXISTS (SELECT 1 FROM public.projects WHERE name = 'Cantt Road Boundary Wall');
+
 
