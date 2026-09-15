@@ -256,6 +256,56 @@ GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION public.is_active_contractor() TO authenticated, anon;
 
 -- ============================================================
+-- 7b. PRIVILEGE ESCALATION & INTEGRITY TRIGGERS
+-- ============================================================
+
+-- Prevent non-admins from self-escalating role on profiles table
+CREATE OR REPLACE FUNCTION public.prevent_privilege_self_escalation()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT is_admin() THEN
+    IF NEW.role IS DISTINCT FROM OLD.role THEN
+      RAISE EXCEPTION 'Only an admin can change role.';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_prevent_privilege_escalation ON profiles;
+CREATE TRIGGER trg_prevent_privilege_escalation
+  BEFORE UPDATE ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_privilege_self_escalation();
+
+-- Prevent non-admins from tagging projects as is_demo = true (leaking private client data)
+CREATE OR REPLACE FUNCTION public.prevent_demo_tampering()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT is_admin() THEN
+    IF NEW.is_demo = true AND (TG_OP = 'INSERT' OR OLD.is_demo IS DISTINCT FROM true) THEN
+      NEW.is_demo := false;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_prevent_demo_tampering ON projects;
+CREATE TRIGGER trg_prevent_demo_tampering
+  BEFORE INSERT OR UPDATE ON projects
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_demo_tampering();
+
+-- ============================================================
 -- 8. ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================
 
@@ -295,7 +345,7 @@ DO $$ BEGIN
   CREATE POLICY "Allow anon to submit access request"
     ON access_requests FOR INSERT
     TO anon, authenticated
-    WITH CHECK (true);
+    WITH CHECK (status = 'pending');
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
