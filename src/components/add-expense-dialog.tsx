@@ -349,6 +349,7 @@ export function AddExpenseDialog({
 
       // Success — show in-sheet celebration animation & navigate behind the scenes
       const targetProjectId = projectId;
+      const createdExpenseId = res?.data?.id;
       setSuccessDetails({
         amount: amountNum,
         category,
@@ -356,9 +357,12 @@ export function AddExpenseDialog({
       });
       setIsExpenseSuccess(true);
 
-      // Behind the scenes navigation directly to the project expenses section
+      // Behind the scenes navigation directly to the project expenses section with highlight
       startTransition(() => {
-        router.push(`/projects/${targetProjectId}#expenses`);
+        const dest = createdExpenseId
+          ? `/projects/${targetProjectId}?highlight=${createdExpenseId}#expense-${createdExpenseId}`
+          : `/projects/${targetProjectId}#expenses`;
+        router.push(dest);
         router.refresh();
       });
 

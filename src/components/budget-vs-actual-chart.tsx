@@ -80,8 +80,8 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
 
             {/* Project Bar Columns */}
             {data.map((item, index) => {
-              const budgetH = Math.max((item.budget / maxVal) * 100, 8);
-              const spentH = Math.max((item.spent / maxVal) * 100, item.spent > 0 ? 8 : 4);
+              const budgetH = Math.max((item.budget / maxVal) * 100, 3);
+              const spentH = item.spent > 0 ? Math.max((item.spent / maxVal) * 100, 1.5) : 0;
               const isOver = item.spent > item.budget;
               const isHovered = hoveredIndex === index;
               const isSelected = selectedIndex === index;
@@ -149,12 +149,19 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
                     </div>
                   </div>
 
+                  {/* Mini Sub-Labels for the Bars */}
+                  <div className="w-full flex items-center justify-around text-[8px] font-black text-slate-400 mt-1 pointer-events-none uppercase tracking-tighter">
+                    <span>Budget</span>
+                    <span>Spent</span>
+                  </div>
+
                   {/* Project Name & Percentage Label */}
-                  <div className="mt-2 text-center w-full px-0.5 z-10 pointer-events-none">
+                  <div className="mt-1 text-center w-full px-0.5 z-10 pointer-events-none">
                     <p
                       className={`text-xs font-black truncate transition-colors ${
                         isActive ? 'text-orange-600' : 'text-slate-900'
                       }`}
+                      title={item.fullName}
                     >
                       {item.name}
                     </p>
@@ -181,12 +188,15 @@ export function BudgetVsActualChart({ data }: BudgetVsActualChartProps) {
         </div>
       </div>
 
-      {/* Horizontal scroll helper if more than 3 projects */}
-      {data.length > 3 && (
-        <p className="text-[10px] font-semibold text-slate-400 text-right -mt-2 pr-1 sm:hidden">
-          Swipe left/right to view all projects &rarr;
-        </p>
-      )}
+      {/* X-Axis Title & Scroll Helper */}
+      <div className="flex items-center justify-between px-2 pt-1.5 pb-1 border-t border-slate-100 text-[11px] font-bold text-slate-500">
+        <span className="uppercase tracking-wider">X-Axis: Project Sites</span>
+        {data.length > 3 && (
+          <span className="text-[10px] font-semibold text-slate-400">
+            Swipe left/right to view all projects &rarr;
+          </span>
+        )}
+      </div>
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-4 sm:gap-6 pt-1 pb-1 text-xs font-bold text-slate-700">

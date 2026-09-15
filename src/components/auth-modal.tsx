@@ -52,7 +52,12 @@ export function AuthModal() {
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState<{
+    fullName: string;
+    phone: string;
+    companyName: string;
+    email: string;
+  } | null>(null);
 
   if (!isAuthModalOpen) return null;
 
@@ -83,16 +88,29 @@ export function AuthModal() {
   async function handleRequestAccessSubmit(e: React.FormEvent) {
     e.preventDefault();
     setRequestError(null);
+
+    const cleanPhone = phone.replace(/[\s\-+]/g, '');
+    if (!/^03\d{9}$/.test(cleanPhone)) {
+      setRequestError('Phone number must be exactly 11 digits starting with 03 (e.g. 03001234567).');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(signUpEmail.trim())) {
+      setRequestError('Please enter a valid email address (e.g. name@domain.com).');
+      return;
+    }
+
     setRequestLoading(true);
 
     try {
       const res = await withTimeout(
         submitAccessRequest({
-          fullName,
-          phone,
-          companyName,
-          location,
-          email: signUpEmail,
+          fullName: fullName.trim(),
+          phone: cleanPhone,
+          companyName: companyName.trim(),
+          location: location.trim(),
+          email: signUpEmail.trim().toLowerCase(),
         })
       );
 
@@ -115,15 +133,15 @@ export function AuthModal() {
   async function handlePasswordResetSubmit(e: React.FormEvent) {
     e.preventDefault();
     setResetError(null);
-    setResetSuccess(false);
+    setResetSuccess(null);
     setResetLoading(true);
 
     try {
       const res = await withTimeout(checkEmailAndRequestPasswordReset(resetEmail));
       if (!res.success) {
-        setResetError(res.error || 'Please enter a valid email address.');
-      } else {
-        setResetSuccess(true);
+        setResetError(res.error || 'No approved contractor account found with this email.');
+      } else if (res.contractor) {
+        setResetSuccess(res.contractor);
       }
     } catch (err: unknown) {
       setResetError(
@@ -141,7 +159,7 @@ export function AuthModal() {
     setSignInError(null);
     setRequestError(null);
     setResetError(null);
-    setResetSuccess(false);
+    setResetSuccess(null);
     closeAuthModal();
   }
 
@@ -271,10 +289,10 @@ export function AuthModal() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-base font-black text-foreground">
-                      Request Processed
+                      Account Verified in Database!
                     </h3>
                     <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                      If this email is registered, you will see a prompt to contact the admin via WhatsApp for a temporary password.
+                      Found active contractor profile for <strong className="text-foreground">{resetSuccess.fullName}</strong> ({resetSuccess.companyName}).
                     </p>
                   </div>
 
@@ -284,25 +302,25 @@ export function AuthModal() {
                       <span>Contact Admin for Temporary Password</span>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      To receive your secure temporary credentials directly, message Admin (Qazi Israr) on WhatsApp:
+                      To receive your secure temporary credentials directly, message Admin (Qazi Israr) on WhatsApp at <strong>0300 5064077</strong>:
                     </p>
                     <a
-                      href={`https://wa.me/923165951951?text=${encodeURIComponent(
-                        `Assalam-o-Alaikum Admin Qazi Israr,\n\nI requested a password reset for my Rapido contractor account (${resetEmail}).\n\nPlease generate and send me a temporary password to log in.`
+                      href={`https://wa.me/923005064077?text=${encodeURIComponent(
+                        `Assalam-o-Alaikum Admin Qazi Israr,\n\nI requested a password reset for my Rapido contractor account:\n• Name: ${resetSuccess.fullName}\n• Email: ${resetSuccess.email}\n• Phone: ${resetSuccess.phone}\n• Company: ${resetSuccess.companyName}\n\nPlease generate and send me a temporary password to log in.`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 text-xs shadow transition-all cursor-pointer tap-scale"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      <span>WhatsApp Admin for Temporary Password</span>
+                      <span>WhatsApp Admin (0300 5064077)</span>
                     </a>
                   </div>
 
                   <button
                     type="button"
                     onClick={() => {
-                      setSignInEmail(resetEmail);
+                      setSignInEmail(resetSuccess.email);
                       openAuthModal('signin');
                     }}
                     className="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white font-black rounded-xl text-xs transition-colors cursor-pointer tap-scale shadow-sm"
@@ -414,7 +432,7 @@ export function AuthModal() {
                     onClick={() => {
                       setResetEmail(signInEmail || '');
                       setResetError(null);
-                      setResetSuccess(false);
+                      setResetSuccess(null);
                       openAuthModal('reset');
                     }}
                     className="text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
@@ -512,9 +530,10 @@ export function AuthModal() {
                       name="tel"
                       autoComplete="tel"
                       required
+                      maxLength={11}
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+92 300 1234567"
+                      placeholder="03001234567"
                       className="w-full pl-8 pr-2.5 py-2 bg-muted/40 border border-border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500 transition-all text-foreground placeholder:text-muted-foreground/60"
                     />
                   </div>

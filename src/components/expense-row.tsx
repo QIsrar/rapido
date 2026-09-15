@@ -72,9 +72,14 @@ const categoryConfig: Record<
 interface ExpenseRowProps {
   expense: Expense;
   showDelete?: boolean;
+  isHighlighted?: boolean;
 }
 
-export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
+export function ExpenseRow({
+  expense,
+  showDelete = true,
+  isHighlighted = false,
+}: ExpenseRowProps) {
   const router = useRouter();
   const config = categoryConfig[expense.category] || categoryConfig.Misc;
   const Icon = config.icon;
@@ -84,10 +89,25 @@ export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [highlighted, setHighlighted] = useState(isHighlighted);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isHighlighted) {
+      setHighlighted(true);
+      const el = document.getElementById(`expense-${expense.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const timer = setTimeout(() => {
+        setHighlighted(false);
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [isHighlighted, expense.id]);
 
   const dateObj = new Date(expense.date);
   const formattedDate = dateObj.toLocaleDateString('en-PK', {
@@ -218,7 +238,14 @@ export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
 
   return (
     <>
-      <div className="flex items-center gap-3 py-3 px-2 border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/80 group">
+      <div
+        id={`expense-${expense.id}`}
+        className={`flex items-center gap-3 py-3 px-2 border-b border-slate-100 last:border-0 transition-all duration-500 rounded-xl group ${
+          highlighted
+            ? 'bg-amber-50/90 ring-2 ring-orange-500 shadow-md shadow-orange-500/10 scale-[1.01]'
+            : 'hover:bg-slate-50/80'
+        }`}
+      >
         {/* Category icon */}
         <div
           className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${config.bg}`}
@@ -228,9 +255,16 @@ export function ExpenseRow({ expense, showDelete = true }: ExpenseRowProps) {
 
         {/* Description + category */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-900 truncate">
-            {expense.description || expense.category}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold text-slate-900 truncate">
+              {expense.description || expense.category}
+            </p>
+            {highlighted && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-orange-600 text-white animate-pulse tracking-wide shrink-0">
+                JUST ADDED
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-1.5 mt-0.5">
             <span className="text-xs font-medium text-slate-500">
               {expense.category}

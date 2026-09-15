@@ -26,10 +26,15 @@ const categoryAccentMap: Record<string, string> = {
 
 export default async function ProjectDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ highlight?: string }>;
 }) {
   const { id } = await params;
+  const sParams = searchParams ? await searchParams : {};
+  const highlightExpenseId = sParams?.highlight || null;
+
   const [project, laborLogs] = await Promise.all([
     getProjectById(id),
     getLaborLogs(id),
@@ -243,6 +248,7 @@ export default async function ProjectDetailsPage({
         categoryAccentMap={categoryAccentMap}
         isCompleted={isCompleted}
         laborLogs={laborLogs}
+        highlightExpenseId={highlightExpenseId}
       />
 
       {/* Floating Action Button only for active projects */}

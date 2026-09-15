@@ -18,6 +18,10 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Filter,
+  ArrowUpDown,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,9 +60,14 @@ export function LaborLogSection({
 
   // Status & Feedback
   const [isSaving, setIsSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [logToDelete, setLogToDelete] = useState<LaborLog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Filtering & Sorting State
+  const [filterCrew, setFilterCrew] = useState<'all' | 'masons' | 'laborers'>('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'amount_desc' | 'amount_asc'>('recent');
 
   // Computed total cost for current input
   const currentTotalCost =
@@ -152,7 +161,9 @@ export function LaborLogSection({
     }
   };
 
-  const handleDeleteLog = async (logId: string) => {
+  const handleConfirmDelete = async () => {
+    if (!logToDelete) return;
+
     if (isGuest) {
       openAuthModal('signin');
       return;
@@ -160,16 +171,12 @@ export function LaborLogSection({
 
     if (isCompleted) return;
 
-    if (!confirm('Are you sure you want to delete this daily labor attendance record?')) {
-      return;
-    }
-
-    setDeletingId(logId);
+    setIsDeleting(true);
     setErrorMsg(null);
 
     try {
       const res = await withTimeout(
-        deleteLaborLog(logId, projectId),
+        deleteLaborLog(logToDelete.id, projectId),
         12000,
         'Request timed out deleting labor log.'
       );
@@ -177,7 +184,9 @@ export function LaborLogSection({
       if (!res.success) {
         setErrorMsg(res.error || 'Failed to delete labor log.');
       } else {
-        setLogs((prev) => prev.filter((l) => l.id !== logId));
+        const deletedId = logToDelete.id;
+        setLogs((prev) => prev.filter((l) => l.id !== deletedId));
+        setLogToDelete(null);
         startTransition(() => {
           router.refresh();
         });
@@ -185,12 +194,135 @@ export function LaborLogSection({
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'Failed to delete labor log.');
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
+  // Filter and sort the attendance logs
+  const filteredAndSortedLogs = [...logs]
+    .filter((log) => {
+      if (filterCrew === 'masons') return log.masons_count > 0;
+      if (filterCrew === 'laborers') return log.laborers_count > 0;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'oldest') {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      }
+      if (sortBy === 'amount_desc') {
+        return Number(b.total_cost) - Number(a.total_cost);
+      }
+      if (sortBy === 'amount_asc') {
+        return Number(a.total_cost) - Number(b.total_cost);
+      }
+      // default: recent entries first
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+
   return (
-    <div className="space-y-5 animate-slide-up">
+    <div className="space-y-5 animate-slide-up relative">
+      {/* 
+        Full Screen Non-Clickable Overlay when Saving:
+        Freezes the entire screen so user cannot tap anything until completion.
+      */}
+      {isSaving && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-white pointer-events-auto select-none animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center max-w-xs space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-orange-600 text-white flex items-center justify-center shadow-lg shadow-orange-600/30">
+              <Loader2 className="w-7 h-7 animate-spin stroke-[2.5]" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-white">Saving Today&apos;s Attendance...</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                Screen is locked until attendance muster roll is recorded safely.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 
+        Custom Modal Confirmation Dialog for Deleting Labor Log:
+        Replaces standard browser confirm() alert.
+      */}
+      {logToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 space-y-4 animate-in zoom-in-95 duration-150 relative overflow-hidden">
+            <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-red-500 via-rose-500 to-red-600" />
+
+            <div className="flex items-start justify-between pt-1">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 border-2 border-red-200 text-red-600 flex items-center justify-center shadow-xs">
+                <Trash2 className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <button
+                type="button"
+                onClick={() => setLogToDelete(null)}
+                disabled={isDeleting}
+                className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-slate-900">
+                Delete Attendance Record?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Are you sure you want to delete attendance for{' '}
+                <strong className="text-slate-900">
+                  {new Date(logToDelete.date).toLocaleDateString('en-PK', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                  })}
+                </strong>
+                ? This will remove{' '}
+                <strong className="text-slate-900">
+                  {logToDelete.masons_count + logToDelete.laborers_count} workers ({formatPKR(logToDelete.total_cost)})
+                </strong>{' '}
+                from this project.
+              </p>
+            </div>
+
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200/80 flex items-start gap-2.5 text-amber-900 text-xs font-semibold">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>This action cannot be undone and will deduct the wages from project spent.</span>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setLogToDelete(null)}
+                disabled={isDeleting}
+                className="w-full py-2.5 px-3 rounded-xl border-2 border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="w-full py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-md shadow-red-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Yes, Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Overview Metric Banners */}
       <div className="grid grid-cols-2 gap-2">
         <Card className="p-3.5 bg-gradient-to-br from-amber-50 to-orange-50/50 border border-amber-200/80 shadow-2xs">
@@ -236,12 +368,12 @@ export function LaborLogSection({
                   Log Today&apos;s Attendance (Hazri)
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium">
-                  Tap + or - to set today&apos;s on-site headcount
+                  Tap + or - to adjust daily on-site headcount
                 </p>
               </div>
             </div>
 
-            {/* Date Picker */}
+            {/* Date Picker: Standard frozen beyond current date */}
             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700">
               <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               <input
@@ -250,6 +382,7 @@ export function LaborLogSection({
                 max={todayStr}
                 onChange={(e) => setDate(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                title="Calendar is locked to today or past dates (future attendance is restricted)"
               />
             </div>
           </div>
@@ -272,14 +405,14 @@ export function LaborLogSection({
 
             {/* Steppers Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Masons (Raj / Mistri) Stepper */}
+              {/* Masons (Mistri) Stepper - 'Raj' replaced per instructions */}
               <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/90 flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xl">👷</span>
                     <div>
                       <span className="text-xs font-black text-slate-900 block leading-tight">
-                        Masons (Raj / Mistri)
+                        Masons (Mistri)
                       </span>
                       <span className="text-[10px] font-semibold text-amber-700">
                         @{formatPKR(dailyRateMason)}/day
@@ -295,7 +428,7 @@ export function LaborLogSection({
                   <button
                     type="button"
                     onClick={() => handleMasonChange(-1)}
-                    disabled={masonsCount <= 0}
+                    disabled={masonsCount <= 0 || isSaving}
                     aria-label="Decrease masons count"
                     className="w-11 h-11 rounded-lg bg-amber-100/70 hover:bg-amber-200 text-amber-900 font-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all tap-scale cursor-pointer"
                   >
@@ -314,8 +447,9 @@ export function LaborLogSection({
                   <button
                     type="button"
                     onClick={() => handleMasonChange(1)}
+                    disabled={isSaving}
                     aria-label="Increase masons count"
-                    className="w-11 h-11 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black flex items-center justify-center active:scale-95 transition-all tap-scale cursor-pointer shadow-xs"
+                    className="w-11 h-11 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black flex items-center justify-center active:scale-95 transition-all tap-scale cursor-pointer shadow-xs disabled:opacity-50"
                   >
                     <Plus className="w-5 h-5 stroke-[2.5]" />
                   </button>
@@ -345,7 +479,7 @@ export function LaborLogSection({
                   <button
                     type="button"
                     onClick={() => handleLaborerChange(-1)}
-                    disabled={laborersCount <= 0}
+                    disabled={laborersCount <= 0 || isSaving}
                     aria-label="Decrease laborers count"
                     className="w-11 h-11 rounded-lg bg-blue-100/70 hover:bg-blue-200 text-blue-900 font-black flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all tap-scale cursor-pointer"
                   >
@@ -364,8 +498,9 @@ export function LaborLogSection({
                   <button
                     type="button"
                     onClick={() => handleLaborerChange(1)}
+                    disabled={isSaving}
                     aria-label="Increase laborers count"
-                    className="w-11 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center active:scale-95 transition-all tap-scale cursor-pointer shadow-xs"
+                    className="w-11 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black flex items-center justify-center active:scale-95 transition-all tap-scale cursor-pointer shadow-xs disabled:opacity-50"
                   >
                     <Plus className="w-5 h-5 stroke-[2.5]" />
                   </button>
@@ -389,6 +524,7 @@ export function LaborLogSection({
               <button
                 type="button"
                 onClick={() => setShowRateSettings(!showRateSettings)}
+                disabled={isSaving}
                 className="text-[11px] font-semibold text-slate-300 hover:text-white flex items-center gap-1 bg-slate-800/80 px-2.5 py-1.5 rounded-xl border border-slate-700 tap-scale transition-colors cursor-pointer"
               >
                 <span>Edit Daily Rates</span>
@@ -412,7 +548,7 @@ export function LaborLogSection({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Mason Rate (Raj)
+                      Mason Rate (Mistri)
                     </label>
                     <div className="relative">
                       <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">
@@ -496,38 +632,97 @@ export function LaborLogSection({
         </Card>
       )}
 
-      {/* Attendance History Section */}
-      <section className="space-y-2.5">
-        <div className="flex items-center justify-between">
+      {/* Attendance History Section with Filter & Sort */}
+      <section className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>Attendance History ({logs.length})</span>
+            <span>Attendance History ({filteredAndSortedLogs.length})</span>
           </h4>
-          <span className="text-[11px] font-semibold text-slate-400">
-            {logs.length > 0 ? 'Recent entries first' : 'Empty'}
-          </span>
+
+          {/* Filter and Sort controls */}
+          {logs.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Filter Pills */}
+              <div className="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200 text-[10px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setFilterCrew('all')}
+                  className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                    filterCrew === 'all'
+                      ? 'bg-white text-slate-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterCrew('masons')}
+                  className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                    filterCrew === 'masons'
+                      ? 'bg-white text-amber-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Only Mistris
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterCrew('laborers')}
+                  className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                    filterCrew === 'laborers'
+                      ? 'bg-white text-blue-900 shadow-2xs font-black'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Only Mazdoors
+                </button>
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="relative inline-flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-2 py-1 text-[10px] font-bold text-slate-700 shadow-2xs">
+                <ArrowUpDown className="w-3 h-3 text-slate-400 shrink-0" />
+                <select
+                  value={sortBy}
+                  onChange={(e) =>
+                    setSortBy(e.target.value as 'recent' | 'oldest' | 'amount_desc' | 'amount_asc')
+                  }
+                  className="bg-transparent text-[10px] font-bold text-slate-800 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="recent">Recent entries</option>
+                  <option value="oldest">Oldest entries</option>
+                  <option value="amount_desc">Highest amount</option>
+                  <option value="amount_asc">Lowest amount</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
-        {logs.length === 0 ? (
+        {filteredAndSortedLogs.length === 0 ? (
           <Card className="p-8 text-center bg-white border border-slate-200 rounded-2xl shadow-2xs">
             <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 mx-auto flex items-center justify-center mb-2.5">
               <HardHat className="w-6 h-6" />
             </div>
-            <p className="text-sm font-black text-slate-800">No Labor Logs Yet</p>
+            <p className="text-sm font-black text-slate-800">
+              {logs.length === 0 ? 'No Labor Logs Yet' : 'No entries matching filter'}
+            </p>
             <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1">
-              Keep track of daily masons and laborers headcount above. Total daily wages will be computed automatically.
+              {logs.length === 0
+                ? 'Keep track of daily mistris and mazdoors headcount above. Total daily wages will be computed and counted in spent automatically.'
+                : 'Try switching the filter to "All" to view previous attendance logs.'}
             </p>
           </Card>
         ) : (
           <div className="space-y-2">
-            {logs.map((log) => {
+            {filteredAndSortedLogs.map((log) => {
               const formattedDate = new Date(log.date).toLocaleDateString('en-PK', {
                 weekday: 'short',
                 day: 'numeric',
                 month: 'short',
                 year: 'numeric',
               });
-              const isDeleting = deletingId === log.id;
 
               return (
                 <Card
@@ -555,7 +750,7 @@ export function LaborLogSection({
                             variant="outline"
                             className="bg-amber-50 text-amber-800 border-amber-200 text-[11px] font-bold px-2 py-0.5"
                           >
-                            👷 {log.masons_count} {log.masons_count === 1 ? 'Mason' : 'Masons'}
+                            👷 {log.masons_count} {log.masons_count === 1 ? 'Mason (Mistri)' : 'Masons (Mistri)'}
                           </Badge>
                         )}
 
@@ -564,7 +759,7 @@ export function LaborLogSection({
                             variant="outline"
                             className="bg-blue-50 text-blue-800 border-blue-200 text-[11px] font-bold px-2 py-0.5"
                           >
-                            🔨 {log.laborers_count} {log.laborers_count === 1 ? 'Laborer' : 'Laborers'}
+                            🔨 {log.laborers_count} {log.laborers_count === 1 ? 'Laborer (Mazdoor)' : 'Laborers (Mazdoor)'}
                           </Badge>
                         )}
 
@@ -581,7 +776,7 @@ export function LaborLogSection({
                       )}
                     </div>
 
-                    {/* Total Cost & Delete */}
+                    {/* Total Cost & Delete Modal Trigger */}
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <span className="text-sm font-black text-slate-900 tracking-tight">
                         {formatPKR(log.total_cost)}
@@ -590,16 +785,12 @@ export function LaborLogSection({
                       {!isCompleted && (
                         <button
                           type="button"
-                          onClick={() => handleDeleteLog(log.id)}
-                          disabled={isDeleting}
+                          onClick={() => setLogToDelete(log)}
                           aria-label="Delete labor log entry"
                           className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer tap-scale"
+                          title="Delete this attendance record"
                         >
-                          {isDeleting ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>

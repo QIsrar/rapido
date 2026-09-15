@@ -85,9 +85,19 @@ export async function getProjects(): Promise<{
 
     const expensesList: Expense[] = expensesError || !expensesData ? [] : expensesData;
 
+    // Fetch labor_logs to incorporate labor cost into total_spent
+    let { data: laborData } = await supabase
+      .from('labor_logs')
+      .select('project_id, total_cost');
+    const laborList = laborData || [];
+
     const merged: ProjectWithExpenses[] = (projectsData || []).map((project: Project) => {
       const pExpenses = expensesList.filter((e) => e.project_id === project.id);
-      const total_spent = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const expenseSpend = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const laborSpend = laborList
+        .filter((l) => l.project_id === project.id)
+        .reduce((sum, l) => sum + Number(l.total_cost || 0), 0);
+      const total_spent = expenseSpend + laborSpend;
       return {
         ...project,
         expenses: pExpenses,
@@ -149,10 +159,22 @@ export async function getProjectById(
     }
 
     const expensesList: Expense[] = expenses || [];
-    const total_spent = expensesList.reduce(
+
+    // Fetch labor_logs to incorporate labor cost into total_spent
+    let { data: laborData } = await supabase
+      .from('labor_logs')
+      .select('total_cost')
+      .eq('project_id', id);
+
+    const laborSpend = (laborData || []).reduce(
+      (sum, l) => sum + Number(l.total_cost || 0),
+      0
+    );
+    const expenseSpend = expensesList.reduce(
       (sum, e) => sum + Number(e.amount),
       0
     );
+    const total_spent = expenseSpend + laborSpend;
 
     return {
       ...project,
@@ -827,6 +849,27 @@ export async function getReportsData(): Promise<ReportsData> {
   for (const e of allExpenses) {
     catMap[e.category] = (catMap[e.category] || 0) + Number(e.amount);
   }
+
+  // Include labor attendance in category totals and lifetime spend
+  let totalLaborSpend = 0;
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = await getDb();
+      const { data: laborData } = await supabase
+        .from('labor_logs')
+        .select('date, total_cost');
+      if (laborData) {
+        for (const l of laborData) {
+          const cost = Number(l.total_cost || 0);
+          totalLaborSpend += cost;
+          catMap['Labor'] = (catMap['Labor'] || 0) + cost;
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+  }
+
   const categoryTotals = Object.entries(catMap)
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total);
@@ -865,10 +908,8 @@ export async function getReportsData(): Promise<ReportsData> {
     }));
 
   // Quick stats
-  const totalLifetimeSpend = allExpenses.reduce(
-    (sum, e) => sum + Number(e.amount),
-    0
-  );
+  const totalLifetimeSpend =
+    allExpenses.reduce((sum, e) => sum + Number(e.amount), 0) + totalLaborSpend;
   const topCategory = categoryTotals.length > 0 ? categoryTotals[0].category : 'N/A';
 
   return {

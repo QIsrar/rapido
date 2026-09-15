@@ -509,11 +509,16 @@ export async function rejectAccessRequest(requestId: string): Promise<{
 }
 
 /**
- * Check if email exists in approved accounts and request a password reset.
- * OWASP compliant: Always returns generic success to prevent account enumeration.
+ * Check if email exists in approved accounts and coordinate a password reset.
  */
 export async function checkEmailAndRequestPasswordReset(email: string): Promise<{
   success: boolean;
+  contractor?: {
+    fullName: string;
+    phone: string;
+    companyName: string;
+    email: string;
+  };
   error?: string;
 }> {
   try {
@@ -537,17 +542,30 @@ export async function checkEmailAndRequestPasswordReset(email: string): Promise<
       console.warn('Error checking access requests for password reset:', reqError);
     }
 
-    if (request) {
-      // Trigger Supabase's native reset email if configured
-      try {
-        await supabase.auth.resetPasswordForEmail(cleanEmail);
-      } catch {
-        // Non-blocking: WhatsApp/Admin direct path is primary
-      }
+    if (!request) {
+      return {
+        success: false,
+        error:
+          'No approved contractor account found with this email. Please check your spelling or submit an access request.',
+      };
     }
 
-    // OWASP compliance: Return generic success regardless of existence to prevent enumeration
-    return { success: true };
+    // Trigger Supabase's native reset email if configured
+    try {
+      await supabase.auth.resetPasswordForEmail(cleanEmail);
+    } catch {
+      // Non-blocking: WhatsApp/Admin direct path is primary
+    }
+
+    return {
+      success: true,
+      contractor: {
+        fullName: request.full_name,
+        phone: request.phone,
+        companyName: request.company_name,
+        email: request.email,
+      },
+    };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to process reset request';
     return { success: false, error: message };

@@ -15,6 +15,7 @@ interface ProjectDetailsTabsProps {
   categoryAccentMap: Record<string, string>;
   isCompleted: boolean;
   laborLogs: LaborLog[];
+  highlightExpenseId?: string | null;
 }
 
 export function ProjectDetailsTabs({
@@ -24,8 +25,44 @@ export function ProjectDetailsTabs({
   categoryAccentMap,
   isCompleted,
   laborLogs,
+  highlightExpenseId,
 }: ProjectDetailsTabsProps) {
   const [activeTab, setActiveTab] = useState<'expenses' | 'labor'>('expenses');
+
+  // Swipe detection state
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const minSwipeDistance = 60;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && activeTab === 'expenses') {
+      setActiveTab('labor');
+      if (typeof window !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState(null, '', '#labor');
+      }
+    } else if (isRightSwipe && activeTab === 'labor') {
+      setActiveTab('expenses');
+      if (typeof window !== 'undefined' && window.history.replaceState) {
+        window.history.replaceState(null, '', '#expenses');
+      }
+    }
+    setTouchStartX(null);
+    setTouchEndX(null);
+  };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -39,7 +76,12 @@ export function ProjectDetailsTabs({
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="space-y-4 select-none touch-pan-y"
+    >
       {/* Segmented Tab Navigation Switcher */}
       <div className="flex p-1 bg-slate-100/90 backdrop-blur-sm rounded-2xl border border-slate-200/90 shadow-2xs">
         <button
@@ -155,7 +197,11 @@ export function ProjectDetailsTabs({
                     key={expense.id}
                     className={i % 2 === 1 ? 'bg-slate-50/50 -mx-2 px-2 rounded-lg' : ''}
                   >
-                    <ExpenseRow expense={expense} showDelete={!isCompleted} />
+                    <ExpenseRow
+                      expense={expense}
+                      showDelete={!isCompleted}
+                      isHighlighted={expense.id === highlightExpenseId}
+                    />
                   </div>
                 ))
               )}
@@ -166,7 +212,7 @@ export function ProjectDetailsTabs({
 
       {/* Tab 2: Labor Attendance Log View */}
       {activeTab === 'labor' && (
-        <section id="labor" className="scroll-mt-6">
+        <section id="labor" className="scroll-mt-6 animate-slide-up">
           <LaborLogSection
             projectId={project.id}
             projectName={project.name}

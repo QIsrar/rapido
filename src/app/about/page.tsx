@@ -37,8 +37,7 @@ export default async function AboutPage() {
           />
         </div>
         <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] font-black uppercase tracking-wider mb-1">
-            <Sparkles className="w-3 h-3 text-orange-600" />
+          <div className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[10px] font-black uppercase tracking-wider mb-1">
             Rapido v2.4
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">
