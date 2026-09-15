@@ -320,3 +320,73 @@ summary,
     transform: scaleX(0);
   }
 }
+
+/* ============================================================
+   CHROME SUPPRESSION (For Dedicated Full-Page / Report Views)
+   ============================================================ */
+body:has(.no-chrome) main {
+  padding-bottom: 0 !important;
+}
+
+/* ============================================================
+   CROSS-BROWSER PRINT-TO-PDF STYLES (Android Chrome & iOS Safari)
+   ============================================================ */
+@page {
+  size: A4 portrait;
+  margin: 10mm 12mm 12mm 12mm;
+}
+
+@media print {
+  /* Suppress browser default headers, footers, and all app navigation chrome */
+  nav,
+  footer,
+  aside,
+  .no-print,
+  [data-no-print] {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  main {
+    padding-bottom: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  /* Force background colors and borders in iOS Safari and Android Chrome */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page breaks inside cards, tables, and signature blocks */
+  .print-avoid-break,
+  tr,
+  .kpi-card,
+  .signature-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Clean up screen shadows for crisp vector print */
+  .print-clean-shadow {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+}

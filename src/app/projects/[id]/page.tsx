@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CompleteProjectButton } from '@/components/complete-project-button';
 import { DeleteProjectButton } from '@/components/delete-project-button';
+import { ProjectReportButton } from '@/components/project-report-button';
 import { AddExpenseDialog } from '@/components/add-expense-dialog';
 import { ProjectDetailsTabs } from '@/components/project-details-tabs';
 import { getProjectById, getLaborLogs } from '@/lib/actions';
@@ -103,6 +104,7 @@ export default async function ProjectDetailsPage({
         </Link>
 
         <div className="flex items-center gap-2">
+          <ProjectReportButton project={project} laborLogs={laborLogs} />
           <DeleteProjectButton
             projectId={project.id}
             projectName={project.name}

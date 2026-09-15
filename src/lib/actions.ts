@@ -54,7 +54,11 @@ export async function getProjects(): Promise<{
     }
 
     const supabase = await getDb();
-    const { data: projectsData, error: projectsError } = await supabase
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let { data: projectsData, error: projectsError } = await supabase
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false });
@@ -65,6 +69,11 @@ export async function getProjects(): Promise<{
         projects: getFallbackProjectsWithExpenses(),
         isLive: false,
       };
+    }
+
+    // Defense-in-depth: Guests can only see demo projects
+    if (!user && projectsData && projectsData.length > 0 && 'is_demo' in projectsData[0]) {
+      projectsData = projectsData.filter((p: Project) => p.is_demo === true);
     }
 
     let { data: expensesData, error: expensesError } = await supabase
@@ -89,14 +98,14 @@ export async function getProjects(): Promise<{
     let { data: laborData } = await supabase
       .from('labor_logs')
       .select('project_id, total_cost');
-    const laborList = laborData || [];
+    const laborList: { project_id: string; total_cost: number | string }[] = laborData || [];
 
     const merged: ProjectWithExpenses[] = (projectsData || []).map((project: Project) => {
       const pExpenses = expensesList.filter((e) => e.project_id === project.id);
       const expenseSpend = pExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const laborSpend = laborList
-        .filter((l) => l.project_id === project.id)
-        .reduce((sum, l) => sum + Number(l.total_cost || 0), 0);
+        .filter((l: { project_id: string; total_cost: number | string }) => l.project_id === project.id)
+        .reduce((sum: number, l: { project_id: string; total_cost: number | string }) => sum + Number(l.total_cost || 0), 0);
       const total_spent = expenseSpend + laborSpend;
       return {
         ...project,
@@ -139,6 +148,16 @@ export async function getProjectById(
 
     if (projectError || !project) {
       return null;
+    }
+
+    // Defense-in-depth: if project is a live client project (is_demo === false), verify authentication
+    if (project.is_demo === false) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return null;
+      }
     }
 
     let { data: expenses, error: expensesError } = await supabase
@@ -248,6 +267,7 @@ export async function createProject(formData: {
       total_budget: budget,
       status: 'active',
       location: formData.location?.trim() || null,
+      is_demo: false,
       start_date: now,
       created_at: now,
     };
@@ -258,9 +278,10 @@ export async function createProject(formData: {
       .select()
       .single();
 
-    // Fallback if location column not yet present in Supabase
-    if (error && error.message?.includes('location')) {
-      delete newProject.location;
+    // Fallback if location or is_demo column not yet present in Supabase
+    if (error && (error.message?.includes('location') || error.message?.includes('is_demo'))) {
+      if (error.message?.includes('location')) delete newProject.location;
+      if (error.message?.includes('is_demo')) delete newProject.is_demo;
       const retry = await supabase
         .from('projects')
         .insert([newProject])

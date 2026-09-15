@@ -45,12 +45,16 @@ CREATE TABLE IF NOT EXISTS projects (
   total_budget NUMERIC(12, 2) NOT NULL DEFAULT 0,
   status project_status NOT NULL DEFAULT 'active',
   location TEXT,
+  is_demo BOOLEAN NOT NULL DEFAULT false,
   start_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_demo BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS idx_projects_is_demo ON projects(is_demo);
 
 -- ============================================================
 -- 3. EXPENSES TABLE
@@ -321,13 +325,14 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
--- Anyone (including guests/anon) can view projects for demo
+-- Anyone (including guests/anon) can view demo projects, authenticated contractors can view all
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Anyone can view projects" ON projects;
-  CREATE POLICY "Anyone can view projects"
+  DROP POLICY IF EXISTS "Anyone can view demo projects, authenticated can view all" ON projects;
+  CREATE POLICY "Anyone can view demo projects, authenticated can view all"
     ON projects FOR SELECT
     TO anon, authenticated
-    USING (true);
+    USING (is_demo = true OR is_active_contractor());
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
@@ -371,13 +376,19 @@ DO $$ BEGIN
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
--- Anyone can view expenses
+-- Anyone can view demo expenses, authenticated contractors can view all active expenses
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Anyone can view expenses" ON expenses;
-  CREATE POLICY "Anyone can view expenses"
+  DROP POLICY IF EXISTS "Anyone can view demo expenses, authenticated can view all" ON expenses;
+  CREATE POLICY "Anyone can view demo expenses, authenticated can view all"
     ON expenses FOR SELECT
     TO anon, authenticated
-    USING (true);
+    USING (
+      deleted_at IS NULL AND (
+        (project_id IN (SELECT id FROM projects WHERE is_demo = true))
+        OR is_active_contractor()
+      )
+    );
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
@@ -414,16 +425,20 @@ END $$;
 
 -- ------------------------------------------------------------
 -- LABOR LOGS POLICIES (Daily Attendance / Hazri)
--- Only authenticated contractors/admins can SELECT and INSERT/UPDATE/DELETE
+-- Active contractors can select labor_logs, anon can view demo labor logs
 -- ------------------------------------------------------------
 ALTER TABLE labor_logs ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Active contractors can select labor_logs" ON labor_logs;
-  CREATE POLICY "Active contractors can select labor_logs"
+  DROP POLICY IF EXISTS "Active contractors can select labor_logs, anon can view demo" ON labor_logs;
+  CREATE POLICY "Active contractors can select labor_logs, anon can view demo"
     ON labor_logs FOR SELECT
-    TO authenticated
-    USING (is_active_contractor());
+    TO anon, authenticated
+    USING (
+      (project_id IN (SELECT id FROM projects WHERE is_demo = true))
+      OR is_active_contractor()
+    );
 EXCEPTION WHEN undefined_object THEN null;
 END $$;
 
@@ -491,3 +506,19 @@ END $$;
 -- UPDATE public.profiles
 -- SET role = 'admin', must_reset_password = false
 -- WHERE id = (SELECT id FROM auth.users WHERE email = 'your-email@example.com');
+
+-- ============================================================
+-- 10. DEMO SHOWCASE DATA TAGGING / MIGRATION
+-- ============================================================
+-- Tag existing showcase/test projects as demo projects so Guest Mode
+-- continues to show rich demo data for prospective clients, while
+-- keeping all new contractor projects strictly private (is_demo = false).
+UPDATE public.projects
+SET is_demo = true
+WHERE name IN (
+  'Jinnahabad 10-Marla Build',
+  'Mandian Plaza Renovation',
+  'Supply Depot Maintenance',
+  'Cantt Road Boundary Wall'
+);
+

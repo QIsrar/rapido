@@ -19,6 +19,7 @@ export interface Project {
   total_budget: number;
   status: ProjectStatus;
   location?: string | null;
+  is_demo?: boolean;
   start_date: string;
   completed_at: string | null;
   created_at: string;

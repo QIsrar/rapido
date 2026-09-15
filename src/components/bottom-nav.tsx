@@ -16,6 +16,11 @@ export function BottomNav() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
 
+  // Completely opt out of BottomNav on printable / dedicated report views
+  if (pathname?.includes('/report')) {
+    return null;
+  }
+
   const navItems = isAdmin
     ? [...baseNavItems, { href: '/admin', label: 'Admin', icon: ShieldCheck }]
     : baseNavItems;
